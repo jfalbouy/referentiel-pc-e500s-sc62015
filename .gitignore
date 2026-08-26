@@ -1,0 +1,6 @@
+# Fichiers verrou de Word/Excel, crees quand un document est ouvert
+~$*
+
+# Bruit Windows
+Thumbs.db
+desktop.ini
