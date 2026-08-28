@@ -12,6 +12,29 @@
 
 Ces deux manuels sont la source de la quasi-totalité de `01-architecture-cpu-sc62015.md`, `02-jeu-instructions.md`, `03-memoire-et-systeme-pc-e500s.md` et `04-fcs-iocs.md`.
 
+## 1bis. Le lecteur de disquettes CE-140F
+
+Trois documents, rassemblés dans `Referentiel PC-E500S SC62015/Manuels CE-140F/` — un dossier
+volontairement placé ici pour servir **tous** les projets de `C:\Claude`, aucun d'eux n'ayant
+plus de titre qu'un autre à les héberger.
+
+| Document | Fichier | Nature |
+|---|---|---|
+| *CE-140F Operation Manual* (Sharp, EN/DE/FR) | `CE140F_OPERATION_MANUAL_EN_DE_FR-compressed.pdf` | manuel utilisateur d'origine — **scan sans couche texte** |
+| *CE-140F Service Manual* (Sharp) | `CE140F_Service_manual.pdf` | manuel de service — **scan sans couche texte**, contient la description du protocole |
+| *Tiny Manual CE-140F Emulator* (C. Becker) | `CE-140F-EMU-manual.pdf` | émulateur **matériel** du lecteur sur carte Nucleo, conçu par F. Fumi ([`ffxx68/Sharp_ce140f_emul`](https://github.com/ffxx68/Sharp_ce140f_emul)) ; couche texte exploitable, mais décrit l'usage, pas le protocole |
+
+⚠️ **Les deux manuels Sharp sont des images.** Les fouiller demande de les rendre page à page ;
+`pdftotext` n'en tire rien. Le protocole du câble, lui, est déjà résumé — rétro-conçu depuis le
+dépôt de F. Fumi — dans `SC62015Disassembler/Docs/Synthese/Drivers-IOCS.md` §13 : sélection du
+périphérique bit à bit (`041h` = CE-140F), transport par quartets cadencés `BUSY`/`ACK`, et une
+trame `1 octet de commande + N octets de charge + 1 somme de contrôle`.
+
+Ces documents ont servi en août 2026 à instruire un défaut de la **sauvegarde texte** vers un
+CE-140F émulé, qui tronque silencieusement à la première ligne dont la somme des octets, CR et LF
+compris, vaut `1Ah` — le marqueur de fin de fichier. Dossier complet, rapport et fichiers d'essai :
+`C:\Claude\Bug CE-140F sauvegarde texte\`.
+
 ## 2. Rétro-ingénierie interne au projet (vérifiée sur matériel/listings réels)
 
 | Élément | Emplacement | Nature de la vérification |
