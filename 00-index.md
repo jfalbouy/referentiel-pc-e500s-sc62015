@@ -16,12 +16,15 @@ Référentiel technique en français sur le Sharp PC-E500S et son CPU **SC62015 
 10. [**Fabrication carte FRAM 1024 Ko**](./10-fabrication-carte-1024ko-fram.md) — nomenclature chiffrée (composants, fournisseurs, coût total estimé), schéma fonctionnel proposé (décodeur, registre de banque, sélection des puces) et proposition de PCB (format, empilage, placement), avec hypothèses de conception clairement signalées.
 11. [**Fabrication carte FRAM 256 Ko**](./11-fabrication-carte-256ko-fram.md) — même exercice pour une carte 256 Ko (sans registre de banque, plus simple et moins chère), avec prix de référence du produit commercial japonais équivalent (`tmfg.jp`, ~80 €) et découverte annexe d'un service commercial de transformation RAM interne 32K→256K.
 
+12. [**Étendre le BASIC**](./12-extensions-basic.md) — ajouter ses propres instructions et fonctions à l'interpréteur : les deux crochets de la zone de travail, le format des deux tables, le drapeau instruction/fonction, le contrat d'une routine (`X`, `I`, `BP`, `U`, retenue), le gabarit d'une fonction numérique, et les pièges mesurés (contrainte de nommage, limite à 20 bits, `BASWRK`/`BASPTR`).
+
 ## Comment utiliser ce référentiel
 
 - Pour écrire ou relire du code assembleur SC62015 : commencer par `01` (registres/adressage) et `02` (instructions), puis `05` pour la syntaxe XASM concrète.
 - Pour comprendre ou étendre les annotations du désassembleur (appels système, adresses connues) : `03` et `04`.
 - Pour situer un projet existant dans l'ensemble ou décider où ajouter un nouvel outil : `06`.
 - Pour vérifier ou sourcer une affirmation : `07`.
+- Pour ajouter une instruction ou une fonction au BASIC : `12`, après `03` (la zone de travail) et `05` (la syntaxe XASM).
 
 ## Principe de non-duplication
 
@@ -29,4 +32,4 @@ Ce référentiel **synthétise et traduit** plutôt que de dupliquer intégralem
 
 ## Statut
 
-Version initiale — juillet 2026. À enrichir au fil de l'eau (nouvelles adresses système identifiées, nouveaux outils, corrections). Les emplacements exacts des fichiers sources cités sont donnés dans `07-sources-et-bibliographie.md` pour faciliter les mises à jour futures.
+Version initiale — juillet 2026 ; chapitre 12 ajouté en septembre 2026. À enrichir au fil de l'eau (nouvelles adresses système identifiées, nouveaux outils, corrections). Les emplacements exacts des fichiers sources cités sont donnés dans `07-sources-et-bibliographie.md` pour faciliter les mises à jour futures.

@@ -65,7 +65,7 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 |---|---|---|
 | `CBH` | `TXTBAS` | Adresse (3 octets) où réside `TEXT.BAS` courant. |
 | `CEH` | `DATBAS` | Adresse où réside `DATA.BAS` courant. |
-| `D1H` | `BASWRK` | Adresse des travaux liés à BASIC *(zone interne — à distinguer de `BWORK` en mémoire externe, §5)*. |
+| `D1H` | `BASPTR` | **Pointeur** (3 octets) vers la zone de travail de l'interpréteur BASIC. Nommé `BASWRK` jusqu'en septembre 2026 — même nom que la zone externe `BFD0EH`, ce qui rendait l'adresse interne innommable dans une source et a coûté une dizaine d'essais : voir `12-extensions-basic.md` §7. Porte les crochets d'extension du BASIC en `[(0D1H)+090H]` et `[(0D1H)+093H]`. |
 | `D4H`/`D5H` | `BL`/`BH` | Registre `B` étendu (paire haute/basse, usage interne interpréteur). |
 | `D6H`/`D7H` | `CL`/`CH` | Registre `C` étendu. |
 | `D8H`/`D9H` | `DL`/`DH` | Registre `D` étendu. |
@@ -91,9 +91,9 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 | `BFCC6`–`BFCDB` | voir §6 | Vecteurs RAM des 8 sources d'interruption. |
 | `BFCDE` | `UWORK` | Dernière adresse du slot S1 + 1. |
 | `BFCE1` | `SWORK` | Zone de la pile système (`S`). |
-| `BFD0E` | `BWORK` | Zone de travail BASIC (externe). |
+| `BFD0E` | `BASWRK` | Zone de travail BASIC (externe). Ce nom est celui du listing de E. Kako (`register.lst`, 1990), vérité terrain du corpus. ⚠️ À ne pas confondre avec `BASPTR` = `0D1H`, le pointeur en RAM interne : un `mv x,(baswrk)` serait tronqué à 8 bits par l'assembleur, sans avertissement. |
 | `BFD17` | `IOCSWRK` | Zone de travail IOCS (externe). |
-| `BFD1A` | `USRWRK` | **Zone langage machine** — début de la zone utilisateur pour les programmes en code machine (`CALL &BFD1A` typique après `LOADM`/assemblage). |
+| `BFD1A` | `USRWRK` | **Zone langage machine** — début de la zone utilisateur pour les programmes en code machine (`CALL &BFD1A` typique après `LOADM`/assemblage). ⚠️ Elle ne fait que **23 octets** : les paramètres SIO commencent en `BFD31H`. Un programme plus long assemblé là écrase la configuration de la liaison série, et la panne se manifeste au transfert *suivant*. Au-delà, charger en `BF000H`. |
 | `BFD31`–`BFD62` | — | Paramètres SIO (temporisation, vitesse, parité, fin de ligne `&1A`, délais d'ouverture/fermeture). |
 | `BFD42`–`BFD53` | — | Constantes de codage cassette (`CAS:`) : longueurs et seuils des niveaux logiques 0/1, blocs d'en-tête. |
 | `DF820`–`DF8A9` | — | Chaîne des en-têtes de drivers IOCS (voir §7). |
