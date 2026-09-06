@@ -490,12 +490,41 @@ deux `VAL`, séparés par une recopie de `X` vers `Y` :
 fait, et c'est pourquoi la sonde enchaîne les deux en refaisant le montage entre les deux :
 on ne suppose pas que la commande laisse `Y` intact.
 
-⛔ **Mais `div` reste à mesurer, et il y a une raison précise de s'en méfier.** L'évaluateur
-d'expression de la ROM, en `0E8559H`, fait `exl (000h),(00Fh)` — il **échange** `X` et `Y` —
-avant d'appeler `div`, alors qu'il appelle `sub` **sans** échange. Puisque `sub` est désormais
-mesuré « `Y-X` », cet échange ne peut signifier qu'une chose : **`div` prend ses opérandes dans
-l'autre ordre**, soit « `X/Y -> X` ». *C'est une déduction, pas une mesure* — une sonde calquée
-sur `ADDTEST`, avec `6` et `2`, la trancherait : `3` pour `Y/X`, `0.3333333333` pour `X/Y`.
+✅ **Et `div` aussi**, mesuré le lendemain par `Samples/DEVICE9/DIVTEST.ASM` :
+
+| opérandes | `04Ah div` | `+ 056h int` | `04Bh pow` |
+|---|---|---|---|
+| `7` et `2` | **3.5** | **3** | **49** |
+| `6` et `3` | **2** | **2** | **216** |
+
+**Les quatre opérations suivent donc la même règle, sans exception** — `add`, `sub`, `div`,
+`pow` sont toutes « `Y op X -> X` ». Et l'essai intermédiaire établit le **chaînage** : `int`
+travaille bien sur le résultat que `div` vient de laisser en `X`, ce dont un `MOD` flottant a
+précisément besoin.
+
+⛔ **J'avais déduit le contraire, et la déduction était DOUBLEMENT fausse.** J'avais écrit que
+« l'évaluateur d'expression de la ROM, en `0E8559H`, fait `exl (000h),(00Fh)` avant `div` et pas
+avant `sub`, donc `div` prend ses opérandes à l'envers ». La conclusion est démentie par la
+mesure — et **la prémisse elle-même était fausse** : *cette routine n'est pas l'évaluateur
+d'expression*.
+
+Elle lit son code d'opération dans `[0BFEE3H]`, et cet emplacement n'est écrit que par **deux**
+endroits de la ROM — `0E7CEBH` et `0E8F76H`. Or ce sont exactement les deux branches de famille
+du répartiteur du device 9 :
+
+```asm
+0EF03D  jpz  LOC_E7CE9    ; (ch)=1 -> MATRICES
+0EF040  jpnc LOC_E8F74    ; (ch)=2 -> STATISTIQUES
+```
+
+La routine de `0E8530H` appartient donc à la famille **matrices** ou **statistiques**, où les
+opérandes sont disposés autrement — pas au chemin numérique ordinaire `(ch)=0`. Son `exl` a un
+sens local ; il n'en avait aucun pour un appel simple.
+
+> **La leçon :** j'avais **nommé** cette routine « l'évaluateur d'expression » sans l'établir,
+> puis raisonné sur ce nom. *Une étiquette posée de soi-même n'est pas une source* — c'est la
+> même faute que le `--code BEFBC-BF039` de `register`, où la doctrine avait été écrite d'après
+> notre propre sortie au lieu du listing XASM.
 
 ### Ce qui a réellement fait planter ma première tentative n'est pas établi
 
@@ -695,19 +724,19 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 10. **Les 88 tokens libres.** La table de la ROM en laisse 88 inoccupés, mais rien ne garantit
     qu'une révision de ROM n'en emploie aucun. Vérifiable en confrontant les tables lues dans
     `rom83`, `rom75` et `rom53`.
-11. ✅ **~~La position du second opérande~~** — **mesurée le 2026-09-06** par `ADDTEST.ASM` :
-    `Y` en `(bp+15)`..`(bp+29)`, sens « `Y op X -> X` ». Reste **`div`**, dont le `exl` de la ROM
-    laisse penser qu'il prend ses opérandes à l'envers (§13) : même sonde, `6` et `2`.
-12. **Refaire `MOD` sur le device 9.** Il calcule aujourd'hui en entiers de 20 bits parce que
+11. ✅ **~~La position du second opérande, et le sens de `div`~~** — **mesurés le 2026-09-06**
+    par `ADDTEST.ASM` et `DIVTEST.ASM` : `Y` en `(bp+15)`..`(bp+29)`, et `add`, `sub`, `div`,
+    `pow` toutes « `Y op X -> X` ». Le chaînage de deux commandes est établi lui aussi.
+12. **Refaire `MOD` sur le device 9** — la voie est désormais **entièrement mesurée**. Il calcule aujourd'hui en entiers de 20 bits parce que
     je le croyais coupé de la bibliothèque mathématique (§13). La route IOCS étant établie, un
     `MOD` écrit dessus travaillerait sur les **nombres BASIC** eux-mêmes — domaine complet,
     décimales comprises. `A - B * INT (A/B)` demande quatre commandes : `04AH` div, `056H` int,
-    `049H` mul, `048H` sub. ⚠️ **C'est aussi la première opération BINAIRE**, celle que
-    `Routines-ROM-PC-E500S.asm` annonce comme devant trancher la position du second opérande
-    (`Y` en `(bp+15)`..`(bp+29)`, non vérifié). Commencer par la plus simple — `047H` add,
-    deux opérandes connus, résultat lisible — avant de s'attaquer à `div`, dont le sens des
-    opérandes est en plus suspect (§13). Trois `POKE` et un `CALL` suffisent, sur le modèle de
-    `SQR.ASM`.
+    `049H` mul, `048H` sub — les quatre sont mesurées « `Y op X -> X` », et le chaînage aussi.
+    ⚠️ Restent à trancher : le **domaine** (dix chiffres significatifs, et la troncature du
+    dixième n'est établie que sur un échantillon), et le comportement sur une **division par
+    zéro**, que rien n'a encore éprouvé — la retenue n'indiquant rien, il faudra regarder le
+    résultat. Un `MOD` flottant ne serait donc pas *strictement* meilleur que l'actuel, exact
+    par construction : les faire **coexister** reste le choix raisonnable.
 13. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
     piège du §14 — le jeton d'extension y est figé. `Sharp Basic Converter` sait le produire ;
     reste à vérifier qu'il accepte un token hors des 168 de la ROM.
