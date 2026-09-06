@@ -457,18 +457,45 @@ driver : l'interpréteur l'appelle **directement**, par la table de répartition
 celle que `SQR` emprunte avec succès. *L'absence d'un idiome dans la ROM ne prouve pas qu'il
 soit invalide* ; elle prouve seulement que la ROM n'en a pas l'usage.
 
-### ⚠️ Et le point exact qui m'a manqué y était signalé
+### ✅ Le point qui manquait est maintenant MESURE
 
-La même section porte cet avertissement, écrit le 2 septembre :
+La même section portait cet avertissement, écrit le 2 septembre :
 
 > ⚠ **RESTE NON VERIFIE : l'operande Y en (bp+15)..(bp+29).** Toute la chaine eprouvee ici
 > est unaire. **La premiere operation binaire — « add », « div », une comparaison — le
 > tranchera.**
 
-`MOD` est exactement cette première opération binaire. La chaîne prouvée est **unaire** —
-`val`, `sqr`, `str$` — et rien n'établissait encore où le second opérande devait se trouver.
-Mon échec n'est donc pas une impasse : c'est **l'essai que le dépôt attendait**, mal conduit
-faute d'avoir lu qu'il était attendu.
+`Samples/DEVICE9/ADDTEST.ASM` est cette opération, et la machine a répondu le **2026-09-06** :
+
+| opérandes | résultat |
+|---|---|
+| `3` et `2` | **`ADD 5`**   **`SUB 1`** |
+| `9` et `4` | **`ADD 13`**   **`SUB 5`** |
+
+✅ **`Y` est bien lu en `(bp+15)`..`(bp+29)`, et le sens est bien « `Y op X -> X` ».** Les deux
+essais concordent, et le second departage : `4-9` aurait donné `-5`. Le montage est celui-ci —
+deux `VAL`, séparés par une recopie de `X` vers `Y` :
+
+```asm
+        callf iocs_call     ; 079h val  -> le 1er operande arrive en X
+        mv    i,00015
+        mvl   (BP+15),(BP+0) ; X -> Y : quinze octets, la taille d'un operande
+        callf iocs_call     ; 079h val  -> le 2nd operande arrive en X
+        mvw   (cl),00009h
+        mv    il,047H       ; add : Y+X -> X
+        callf iocs_call
+```
+
+⚠️ **`add` seul ne pouvait PAS trancher le sens** — il est commutatif. C'est `sub` qui le
+fait, et c'est pourquoi la sonde enchaîne les deux en refaisant le montage entre les deux :
+on ne suppose pas que la commande laisse `Y` intact.
+
+⛔ **Mais `div` reste à mesurer, et il y a une raison précise de s'en méfier.** L'évaluateur
+d'expression de la ROM, en `0E8559H`, fait `exl (000h),(00Fh)` — il **échange** `X` et `Y` —
+avant d'appeler `div`, alors qu'il appelle `sub` **sans** échange. Puisque `sub` est désormais
+mesuré « `Y-X` », cet échange ne peut signifier qu'une chose : **`div` prend ses opérandes dans
+l'autre ordre**, soit « `X/Y -> X` ». *C'est une déduction, pas une mesure* — une sonde calquée
+sur `ADDTEST`, avec `6` et `2`, la trancherait : `3` pour `Y/X`, `0.3333333333` pour `X/Y`.
 
 ### Ce qui a réellement fait planter ma première tentative n'est pas établi
 
@@ -668,7 +695,10 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 10. **Les 88 tokens libres.** La table de la ROM en laisse 88 inoccupés, mais rien ne garantit
     qu'une révision de ROM n'en emploie aucun. Vérifiable en confrontant les tables lues dans
     `rom83`, `rom75` et `rom53`.
-11. **Refaire `MOD` sur le device 9.** Il calcule aujourd'hui en entiers de 20 bits parce que
+11. ✅ **~~La position du second opérande~~** — **mesurée le 2026-09-06** par `ADDTEST.ASM` :
+    `Y` en `(bp+15)`..`(bp+29)`, sens « `Y op X -> X` ». Reste **`div`**, dont le `exl` de la ROM
+    laisse penser qu'il prend ses opérandes à l'envers (§13) : même sonde, `6` et `2`.
+12. **Refaire `MOD` sur le device 9.** Il calcule aujourd'hui en entiers de 20 bits parce que
     je le croyais coupé de la bibliothèque mathématique (§13). La route IOCS étant établie, un
     `MOD` écrit dessus travaillerait sur les **nombres BASIC** eux-mêmes — domaine complet,
     décimales comprises. `A - B * INT (A/B)` demande quatre commandes : `04AH` div, `056H` int,
@@ -678,7 +708,7 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
     deux opérandes connus, résultat lisible — avant de s'attaquer à `div`, dont le sens des
     opérandes est en plus suspect (§13). Trois `POKE` et un `CALL` suffisent, sur le modèle de
     `SQR.ASM`.
-12. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
+13. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
     piège du §14 — le jeton d'extension y est figé. `Sharp Basic Converter` sait le produire ;
     reste à vérifier qu'il accepte un token hors des 168 de la ROM.
 
