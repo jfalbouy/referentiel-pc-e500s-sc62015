@@ -399,18 +399,99 @@ extension.
 
 ---
 
-## 13. L'impasse du device 9 — un résultat négatif qui vaut d'être écrit
+## 13. Le device 9 — la route est établie depuis le 2 septembre, et je l'ai ignorée
 
-`MOD` devait d'abord calculer `A - B * INT (A/B)` par la bibliothèque mathématique du
-**device 9**. **Deux versions ont planté la machine** — `CLS` puis retour au MENU principal,
-sans message — et il faut lire la seconde pour comprendre.
+⛔ **La première version de cette section s'intitulait « l'impasse du device 9 ». C'était faux,
+et le dépôt contenait déjà la preuve du contraire.**
 
-**Première version : l'appel était faux.** Elle faisait `mvw (!cx),00009h`, `mv il,04Ah`,
-`callf iocs_call`. Or **la ROM n'écrit jamais 9 dans `(cl)`** : elle y met 0, 1, 3, 6 ou 8.
+### La route qui fonctionne
 
-**Seconde version : les adresses étaient JUSTES, et elle a planté quand même.** Elles sont
-lisibles une à une dans la table de répartition du driver `drv_function` (`0EF029H`) :
-`DB_EF078`, entrées de **2 octets**, index = commande − `041H`.
+`SC62015Disassembler/Samples/DEVICE9/SQR.ASM` appelle la bibliothèque mathématique par
+l'**IOCS**, et calcule `√2 = 1.414213562`. Il a été mis au point sur machine les 2 et
+3 septembre 2026, en **dix étapes** dont plusieurs corrigent une faute d'emploi constatée à
+l'essai. La séquence est celle-ci, et il n'y a rien de plus :
+
+```asm
+d9:     equ     00009H          ; device 9, famille 0 -- (cl) ET (ch) d'un coup
+        ...
+        mvw     (cl),d9
+        mv      il,079H         ; val
+        callf   iocs_call
+        mvw     (cl),d9
+        mv      il,059H         ; sqr
+        callf   iocs_call
+        mvw     (cl),d9
+        mv      il,078H         ; str$
+        callf   iocs_call
+```
+
+Le `mvw` écrit `(cl)` **et** `(ch)` en une fois : `09H` dans le premier, `00H` dans le second —
+et `(ch)` choisit la famille (`0` numérique et chaîne, `1` matrices, `2` statistiques).
+`vogue` procède déjà ainsi, en `0BA788H`.
+
+**La recette canonique est écrite**, dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`
+(section « APPELER LE DEVICE 9 ») :
+
+```
+mvw (cl),00009h    device 9 et famille 0 en une instruction
+mv  il,<commande>  041h-05Bh, 070h-079h, 07Eh-07Fh
+callf iocs_call    les trois instructions JOINTES
+
+nombre   : operande X en (bp+0)..(bp+14), resultat au meme endroit
+chaine   : sur la pile U, longueur en (bp+4) -- et la commande la CONSOMME
+resultat chaine : alloue sur U, adresse et longueur rendues dans le moule
+retenue  : n'indique RIEN (la sortie d'erreur du guichet fait rc/retf)
+```
+
+### Ce que j'avais conclu, et pourquoi c'était faux
+
+J'avais écrit : « **la ROM n'écrit jamais 9 dans `(cl)`** — mon appel était donc faux ».
+
+**L'observation est vraie** : sur les 256 Ko de `rom83`, on ne trouve **aucune** écriture
+immédiate de `9` dans `(cl)`. Elle y met `00H`, `01H`, `02H`, `04H`, `05H`, `06H`, `14H`, `15H`
+ou `5BH`, jamais `09H`.
+
+⛔ **Mais l'inférence est invalide.** La ROM n'a pas besoin de l'IOCS pour atteindre son propre
+driver : l'interpréteur l'appelle **directement**, par la table de répartition de
+`drv_function`. L'IOCS est la porte du code **utilisateur** — celle que le manuel documente, et
+celle que `SQR` emprunte avec succès. *L'absence d'un idiome dans la ROM ne prouve pas qu'il
+soit invalide* ; elle prouve seulement que la ROM n'en a pas l'usage.
+
+### ⚠️ Et le point exact qui m'a manqué y était signalé
+
+La même section porte cet avertissement, écrit le 2 septembre :
+
+> ⚠ **RESTE NON VERIFIE : l'operande Y en (bp+15)..(bp+29).** Toute la chaine eprouvee ici
+> est unaire. **La premiere operation binaire — « add », « div », une comparaison — le
+> tranchera.**
+
+`MOD` est exactement cette première opération binaire. La chaîne prouvée est **unaire** —
+`val`, `sqr`, `str$` — et rien n'établissait encore où le second opérande devait se trouver.
+Mon échec n'est donc pas une impasse : c'est **l'essai que le dépôt attendait**, mal conduit
+faute d'avoir lu qu'il était attendu.
+
+### Ce qui a réellement fait planter ma première tentative n'est pas établi
+
+Le symptôme — `CLS` puis MENU principal — n'a jamais été instruit, puisque j'avais cru tenir la
+cause. L'en-tête de `SQR.ASM` liste **trois fautes d'emploi** trouvées à l'essai machine, et la
+première est un candidat sérieux :
+
+> ⛔ **Sous `pre_on`, `(000H)` est une adresse DIRECTE, pas `(BP+0)`.** Les opérandes partaient
+> en RAM interne 0-4 au lieu de `(bp+0)`-`(bp+4)`, et le Function Driver ne les voyait jamais.
+> On écrit donc `(BP+n)` **explicitement**.
+
+Les deux autres valent d'être connues : ne pas relire trois octets là où l'on en a écrit deux,
+et **ne rien intercaler entre deux commandes** — un appel FCS peut se servir de la zone
+`(bp+n)` pour son propre compte et détruire l'opérande que la commande suivante doit lire.
+
+⚠️ Et une quatrième, propre au guichet : **la retenue n'est pas un indicateur d'erreur ici**.
+La sortie d'erreur du répartiteur (`0EF076H`) fait `rc` / `retf`, donc carry **clair**. Un `jrc`
+après l'appel serait inerte ; c'est le **résultat** qui dit si la commande a travaillé.
+
+### Ce qui reste vrai de mes mesures
+
+La **seconde** tentative n'employait pas l'IOCS : elle sautait directement aux entrées de la
+table de répartition, relevées dans `DB_EF078` (entrées de 2 octets, index = commande − `041H`) :
 
 | commande | entrée | |
 |---|---|---|
@@ -420,13 +501,10 @@ lisibles une à une dans la table de répartition du driver `drv_function` (`0EF
 | `04AH` | `0ECBD8H` | `div` |
 | `056H` | `0EE4D5H` | `int` |
 
-Chacune a bien la forme `call <travail>` puis **`retf`** — donc appelable de la page `0B` — et
-le répartiteur fait même son `popu x` **avant** son `ret` (`0EF05AH`), ce qui rend l'appel
-direct légitime.
-
-⛔ **Ce que ces adresses ne disent pas, c'est le CONTRAT.** La ROM a **deux** diviseurs,
-`SUB_ECCEA` et `SUB_ECD85`, et l'entrée `04AH` ne mène qu'au second. Or le seul appelant connu
-de la ROM — l'évaluateur d'expression, en `0E8559H` — écrit :
+Ces cinq adresses sont exactes, et chacune a bien la forme `call <travail>` puis `retf`. **Mais
+c'est une route différente de l'IOCS, et son contrat n'est pas établi** : la ROM a deux
+diviseurs, `SUB_ECCEA` et `SUB_ECD85`, l'entrée `04AH` ne mène qu'au second, et le seul
+appelant connu — l'évaluateur d'expression, en `0E8559H` — écrit :
 
 ```asm
 mv   i,0000Fh
@@ -434,29 +512,21 @@ exl  (000h),(00Fh)     ; il ÉCHANGE X et Y
 call SUB_ECBDC         ; ... puis seulement divise
 ```
 
-Il échange les deux opérandes avant de diviser, ce que **ne fait aucune des trois autres
-opérations**. Le sens des opérandes de la division n'est donc pas celui qu'on suppose, et
-au-delà de celui-là il reste des conventions que rien, dans la ROM lue, ne fixe — notamment
-l'état attendu de `BP` et le devenir du résultat.
+Il échange les opérandes avant de diviser, ce que ne fait aucune des trois autres opérations.
+**Pour court-circuiter l'IOCS, il faudrait donc établir ce contrat ; pour passer par l'IOCS,
+il n'y a rien à établir — `SQR` l'a fait.**
 
-> **La leçon, et c'est la plus générale de ce document :** *avoir vérifié les adresses ne
-> suffit pas*. Une adresse juste appelée selon un contrat supposé plante exactement comme une
-> adresse fausse. Tant que le contrat n'est pas établi, on ne construit pas dessus.
+### La leçon, et c'est la plus utile du document
 
-**Ce que `MOD` fait à la place** : il n'emploie que des primitives **déjà éprouvées sur la
-machine** — `EFBF3H`/`EF26EH`, `EFAD4H`, `EFB6FH` — et fait la division lui-même, en binaire,
-par restauration : 24 tours, entièrement en RAM interne, dans la queue inutilisée du cadre.
+Deux fois dans la même campagne, j'ai reconstruit — mal — ce que le dépôt établissait déjà :
+le device 9 ici, et le cadre de 15 octets que le §5 donnait depuis le début. **Avant d'ouvrir
+un chantier, lire ce qui a été fait.** `git log` sur le dossier concerné, et les en-têtes des
+sources voisines : `SQR.ASM` porte trente lignes de commentaire qui auraient épargné deux
+plantages et une conclusion fausse.
 
-```
-reste = 0
-24 fois :
-    A <<= 1, le bit sortant entre dans reste     (shl sur 3 + 3 octets)
-    tmp = reste - B                              (sbcl, 3 octets)
-    si pas d'emprunt : reste = tmp
-```
-
-Le quotient est jeté. Le coût est de quelques dizaines d'octets ; le bénéfice est qu'**il n'y
-a plus un seul saut hors du module dont le contrat ne soit pas vérifié**.
+> ⚠️ **Conséquence pour `MOD` :** il calcule en **entiers de 20 bits** parce que je le croyais
+> coupé de la bibliothèque mathématique. Il ne l'est pas. Le refaire sur le device 9 lui
+> donnerait le **domaine complet du BASIC** — voir la piste 12 du §16.
 
 ---
 
@@ -598,7 +668,17 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 10. **Les 88 tokens libres.** La table de la ROM en laisse 88 inoccupés, mais rien ne garantit
     qu'une révision de ROM n'en emploie aucun. Vérifiable en confrontant les tables lues dans
     `rom83`, `rom75` et `rom53`.
-11. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
+11. **Refaire `MOD` sur le device 9.** Il calcule aujourd'hui en entiers de 20 bits parce que
+    je le croyais coupé de la bibliothèque mathématique (§13). La route IOCS étant établie, un
+    `MOD` écrit dessus travaillerait sur les **nombres BASIC** eux-mêmes — domaine complet,
+    décimales comprises. `A - B * INT (A/B)` demande quatre commandes : `04AH` div, `056H` int,
+    `049H` mul, `048H` sub. ⚠️ **C'est aussi la première opération BINAIRE**, celle que
+    `Routines-ROM-PC-E500S.asm` annonce comme devant trancher la position du second opérande
+    (`Y` en `(bp+15)`..`(bp+29)`, non vérifié). Commencer par la plus simple — `047H` add,
+    deux opérandes connus, résultat lisible — avant de s'attaquer à `div`, dont le sens des
+    opérandes est en plus suspect (§13). Trois `POKE` et un `CALL` suffisent, sur le modèle de
+    `SQR.ASM`.
+12. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
     piège du §14 — le jeton d'extension y est figé. `Sharp Basic Converter` sait le produire ;
     reste à vérifier qu'il accepte un token hors des 168 de la ROM.
 
@@ -628,8 +708,15 @@ refus attendus — erreurs 21, 33, 33, 10 et 90.
 
 **Ce que cette campagne a ajouté au document** : les deux évaluateurs (§8), le passage de
 plusieurs arguments (§9, qui était le premier point resté ouvert), le compte des cadres mesuré
-(§10), la distinction `SHL`/`ROL` (§11), l'idempotence de l'installation (§12), l'impasse du
-device 9 (§13), les pièges d'usage (§14) et la méthode de mise au point (§15).
+(§10), la distinction `SHL`/`ROL` (§11), l'idempotence de l'installation (§12), la route IOCS du device 9 (§13), les pièges d'usage (§14) et la méthode de mise au point (§15).
 
-**Reste ouvert** : le retour d'une **chaîne** plutôt que d'un nombre, et les dix autres pistes
+**Reste ouvert** : le retour d'une **chaîne** plutôt que d'un nombre, et les onze autres pistes
 du §16.
+
+⛔ **Une correction du 2026-09-06, et c'est la plus instructive.** La première rédaction du
+§13 concluait à une « impasse du device 9 ». Elle était fausse : `Samples/DEVICE9/SQR.ASM`
+appelait déjà la bibliothèque mathématique par l'IOCS, et le faisait depuis le 2 septembre,
+après dix étapes de mise au point sur machine. J'avais reconstruit — mal — ce que le dépôt
+établissait déjà, exactement comme pour le cadre de 15 octets que le §5 donnait depuis
+toujours. **Lire ce qui a été fait avant d'ouvrir un chantier** est la première règle, et elle
+n'a pas été respectée deux fois dans la même campagne.
