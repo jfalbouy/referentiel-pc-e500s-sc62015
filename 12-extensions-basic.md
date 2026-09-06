@@ -732,11 +732,35 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
     `MOD` écrit dessus travaillerait sur les **nombres BASIC** eux-mêmes — domaine complet,
     décimales comprises. `A - B * INT (A/B)` demande quatre commandes : `04AH` div, `056H` int,
     `049H` mul, `048H` sub — les quatre sont mesurées « `Y op X -> X` », et le chaînage aussi.
-    ⚠️ Restent à trancher : le **domaine** (dix chiffres significatifs, et la troncature du
-    dixième n'est établie que sur un échantillon), et le comportement sur une **division par
-    zéro**, que rien n'a encore éprouvé — la retenue n'indiquant rien, il faudra regarder le
-    résultat. Un `MOD` flottant ne serait donc pas *strictement* meilleur que l'actuel, exact
-    par construction : les faire **coexister** reste le choix raisonnable.
+    ⚠️ Reste à trancher le **domaine** : dix chiffres significatifs, et la troncature du
+    dixième n'est établie que sur un échantillon. Un `MOD` flottant ne serait donc pas
+    *strictement* meilleur que l'actuel, exact par construction : les faire **coexister** reste
+    le choix raisonnable.
+
+> ⛔ **La division par zéro déplace `BP` de +30, en silence** — éprouvé le 2026-09-06 avec
+> `op1 = 7`, `op2 = 0` : la machine a rendu `DIV 0`, `INT -1`, `POW 1`. Seul `POW 1` est un
+> résultat (`7⁰ = 1`, le montage fonctionne même avec `X = 0`) ; les deux autres sont la
+> signature d'un échec muet.
+>
+> Le chemin se lit dans la ROM : `SUB_ECD85` teste `(003h),0F0h`, saute en `LOC_ECD63` qui fait
+> `pmdf +0Fh`, puis en `LOC_ECB5C` qui refait `pmdf +0Fh`. **+30 sur `BP`** — et le code
+> d'erreur 21 que la ROM avait posé dans `A` est perdu en chemin, la sortie du guichet
+> (`0EF076H`) faisant `rc / retf`.
+>
+> **Et cela s'accumule.** Depuis `BP = 070h` : un échec → `08Eh`, deux → `0ACh`, trois →
+> `0CAh` — et l'opérande `Y` occuperait alors `0D9h`–`0E7h`, **par-dessus `si`, `di` et `bp`
+> lui-même**. La sonde n'a survécu à ses deux échecs que parce qu'elle **restaure `BP` en
+> absolu** à la sortie.
+>
+> ✅ **La règle qui en découle, et elle vaut pour toute extension : qui appelle `div` doit
+> tester son diviseur LUI-MÊME, avant l'appel.** C'est ce que fait déjà le `MOD` entier de
+> `Samples/BASEXT`, qui rend l'erreur 21 sur `B = 0` sans jamais laisser la ROM s'en charger —
+> choix qui se trouve validé après coup.
+>
+> ⚠️ Cette lecture explique les trois affichages mais reste une **inférence** : `BP` n'a pas
+> été relevé. Ce qui la soutient est que `INT` aurait dû rendre `0` — `int(0)`, `div` ayant
+> laissé `X` inchangé — et rend `-1`. Pour la **mesurer**, ranger `(bp_ram)` dans une variable
+> du module après chaque essai et la lire au `PEEK`.
 13. **Un `.BSA` d'essai plutôt qu'un `.BAS`.** Un programme livré déjà tokenisé échapperait au
     piège du §14 — le jeton d'extension y est figé. `Sharp Basic Converter` sait le produire ;
     reste à vérifier qu'il accepte un token hors des 168 de la ROM.
