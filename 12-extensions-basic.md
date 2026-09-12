@@ -152,7 +152,7 @@ dehors: retf
 
 | | Adresse | Ce que c'est |
 |---|---|---|
-| `BASWRK` | `BFD0EH` | nom repris du listing de E. Kako (`register.lst`, 1990), vérité terrain du corpus. ⚠️ **Il ne désigne pas la zone mais un POINTEUR vers elle** : la ROM fait `mvp (0D1h),[0BFD0EH]` en `0F98CAH`, c'est-à-dire qu'elle y lit trois octets pour en charger `BASPTR`. Les deux sont donc des pointeurs, l'un en mémoire externe, l'autre sa copie en RAM interne. Corrigé le 2026-09-05 ; `pce500.inc` porte encore l'ancienne description |
+| `BASWRK` | `BFD0EH` | nom repris du listing de E. Kako (`register.lst`, 1990), vérité terrain du corpus. ⚠️ **Il ne désigne pas la zone mais un POINTEUR vers elle** : la ROM fait `mvp (0D1h),[0BFD0EH]` en `0F98CAH`, c'est-à-dire qu'elle y lit trois octets pour en charger `BASPTR`. Les deux sont donc des pointeurs, l'un en mémoire externe, l'autre sa copie en RAM interne. ✅ Corrigé le 2026-09-12 **à la source** — dans `Data/InternalRAMNames.json` et `SystemAddresses.json`, dont `pce500.inc` est **généré** (`xasm2026-4/tools/generate_pce500_inc.py`) : le `.inc` porte en tête « NE PAS EDITER A LA MAIN ». Les sept copies sont réalignées |
 | `BASPTR` | `0D1H` | le **pointeur** vers cette zone, en RAM interne — celui qui porte les crochets |
 
 Le générateur de `pce500.inc` écartait *en silence* l'entrée interne dont le nom existait aussi côté système. L'adresse `0D1H` devenait donc **innommable**, et `mv x,(baswrk)` prenait la version externe — que XASM **tronquait à 8 bits** pour un accès interne, sans le moindre avertissement : `0BFD0EH` devenait `0EH`. L'extension installait ses crochets à la mauvaise adresse, et le mot-clé restait un simple nom de variable.
