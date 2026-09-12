@@ -22,10 +22,29 @@ LABEL:  INSTRUCTION  OPERANDE1,OPERANDE2   ; commentaire
 
 - Label : lettres/chiffres/`_`, ne commence pas par un chiffre, 16 caractères max, insensible à la casse. Le `:` après un label est **obligatoire**, y compris devant `EQU`.
 - `END` obligatoire en fin de fichier (source principal et chaque fichier inclus).
+- **Ligne : 253 caractères au plus** — voir l'avertissement ci-dessous, c'est la seule des trois
+  bornes qui ne se signale pas où il faut.
 - Nombres : suffixe de base `B`/`O`/`D`/`H` (`0E000h`) ou préfixe `$` hexadécimal ; `_` séparateur visuel. Sans suffixe : décimal. Expressions calculées sur 20 bits.
 - Chaînes : `DB 'texte'` développe caractère par caractère ; apostrophe doublée pour l'échapper (`'I don''t know'`).
 - Opérateurs (priorité croissante) : `|` (OR) < `&` (AND) < `%` (modulo) < `+`/`-` < `*`/`/`, plus le signe unaire.
 - `*` = compteur de position courant (utile pour `TAILLE: EQU *-DEBUT` ou `DS cible-*,0`).
+
+> ⛔ **UNE LIGNE TROP LONGUE N'EST PAS REFUSÉE : ELLE EST COUPÉE EN DEUX.** Le moteur C
+> historique lit ses lignes par `fgets(asmtext, 255, …)` (`src/genop.c`). Au-delà de
+> **253 caractères**, la fin de la ligne devient **une ligne à part entière**, que l'assembleur
+> tente de lire comme du source — d'où un `Label format error` signalé sur la ligne
+> **SUIVANTE**, alors que la fautive est celle d'avant. Mesuré : 253 passent, 254 cassent.
+>
+> ⚠️ Les deux autres bornes du moteur C — labels ≤ 16 caractères, `END` dans chaque include —
+> sont dites plus haut, et celles-là **se signalent proprement**. Seule la longueur de ligne
+> ment sur l'emplacement de la faute.
+>
+> Ce n'est pas théorique : la mise aux normes de `pce500.inc` en septembre 2026 a dû renommer
+> `sio_open_port_ctrl` (18 caractères) en `sio_open_ctrl` **à la source**, dans
+> `SC62015Disassembler/Data/SystemAddresses.json` — c'est un symbole d'adresse que le
+> désassembleur émet dans ses opérandes, et le renommer ailleurs aurait fait diverger le carnet
+> et la sortie. Les descriptions longues du même carnet, elles, sont ce qui produisait les
+> lignes de plus de 253 caractères.
 
 ## 3. Directives
 
@@ -74,6 +93,20 @@ Extensions `xasm2026-1`/`xasm2026-1-1` : `REPEAT`/`ENDR`, `IFEQ`/`IFNE`/`IFGT`/`
 | `-B[f]` | `.uu` | Encodage BASIC auto-décodable pour transfert vers PC-E500S. |
 | `-X[f]` | `.txt` | Dump hexadécimal façon HxD. |
 | `-C`/`-W`/`-V`/`-R` | console | Compteur de lignes / warnings / colonne d'erreur / rapport de taille par `SECTION`. |
+
+> ⚠️ **Le nom de fichier VOYAGE DANS l'enveloppe uuencode, et il n'est pas celui que `-O`
+> annonce.** La sortie `-B` porte une ligne `begin 644 NOM.EXT` qu'un décodeur standard lit
+> **pour choisir le fichier à écrire** : renommer le `.uu` après coup ne change donc rien à ce
+> qui sortira à l'autre bout.
+>
+> Or **`xasm2026-4` nomme le `.uu` d'après le `.asm`, pas d'après `-O`** — il sort en minuscules,
+> là où le Sharp et l'émulateur nomment en **majuscules 8.3**. Pour un artefact destiné à la
+> machine, il faut donc **reconstruire** le `.uu` avec le bon `-O` (`-OTYDOS.SYS`), pas le
+> renommer, puis renommer le fichier lui-même.
+>
+> Le `FNAME$` du décodeur BASIC embarqué par `-B`, lui, est déjà correct : il cadre le nom en
+> 8.3 majuscules (`"TYDOS   .SYS"`). C'est l'en-tête uuencode seule qui suit le nom du source.
+> Établi en septembre 2026 sur les douze artefacts de TY-DOS.
 
 ## 5. Formats de fichier objet
 
@@ -131,6 +164,7 @@ Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur
 | `Branch too far` | Saut relatif hors portée. | Utiliser une forme longue/far. |
 | `Duplicate label` | Label déjà défini dans le bloc. | Renommer ou `LOCAL`/`ENDL`. |
 | `EOF comes before END` | `END` manquant. | Ajouter `END`. |
+| `Label format error` **sur une ligne saine** | ⛔ La ligne **précédente** dépasse 253 caractères et a été coupée en deux par le moteur C (voir §2). | Raccourcir la ligne d'**avant**, pas celle que le message désigne. |
 | `Location counter wandered` | `ORG` répété/instable. | Préférer `DS` pour combler un espace. |
 
 ## 8. Voir aussi

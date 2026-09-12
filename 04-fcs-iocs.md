@@ -12,6 +12,37 @@ Le PC-E500S offre trois niveaux d'entrée/sortie, du plus haut niveau (portable,
 
 En BASIC, `OPEN`/`PRINT#`/`INPUT#`/`CLOSE` utilisent le niveau FCS ; les commandes plus spécialisées (contrôle LCD, cassette...) descendent au niveau IOCS.
 
+## 0. ⛔ Un numéro d'`IL` ne veut rien dire tant qu'on ne sait pas QUI le consomme
+
+C'est la première chose à savoir avant de lire — ou d'annoter — du code qui appelle le système.
+`IL` porte un numéro, et **le même numéro désigne des choses différentes selon le vecteur qui
+le reçoit** :
+
+```asm
+callf ptr_fcs      ; 0FFFE4h -> fonction FCS        (carnet : fcs_*)
+callf ptr_iocs     ; 0FFFE8h -> commande IOCS       (carnet : iocs_* sous 041h, sinon propre au device)
+callf ptr_<propre> ;         -> service du programme lui-meme
+```
+
+Le troisième n'est pas une curiosité : un résident qui expose ses propres services publie son
+vecteur et l'appelle avec la même instruction. **TY-DOS** en a un (`ptr_runil`, huit `IL`
+documentés à son manuel), et ses sources mêlent les trois.
+
+⚠️ **Nommer un `mv il,n` sans avoir établi son vecteur produit des noms faux ET
+vraisemblables** — le pire des résultats, puisque rien ne les dénonce à la relecture. Douze
+noms de `tyed.asm` ont été pris ainsi, et débusqués par contrôle croisé avec le carnet FCS.
+
+**La méthode qui tient** : partir du `mv il,n` et **descendre jusqu'au `callf ptr_*`**, en
+traversant au plus une routine intermédiaire, et **s'arrêter** dès que `IL` est détruit, qu'un
+autre chemin peut arriver sur le site, ou que la fenêtre est épuisée. Ce qui n'est pas établi
+**reste littéral**.
+
+> Mesuré sur les 304 sites des six programmes de TY-DOS (septembre 2026) : **174** nommés
+> depuis le carnet (164 FCS, 10 IOCS), **52** depuis les services de TY-DOS, et **78 laissés
+> littéraux** faute d'avoir pu établir leur vecteur — compteur de boucle, longueur d'un `mvl`,
+> valeur chargée loin en amont. Un quart de non-réponses assumées vaut mieux qu'un quart
+> d'inventions.
+
 ## 1. FCS — appel `CALLF FFFE4H`
 
 Convention d'appel : numéro de fonction dans `I` (`IL`), paramètres additionnels dans `A`, `(CL)`, `X` ou `Y` selon la fonction. Retour : `C=0` succès, `C=1` erreur avec code dans `A`.
