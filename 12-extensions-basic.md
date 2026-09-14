@@ -142,7 +142,9 @@ dehors: retf
 
 **`EFB6FH` ne convertit que 20 bits.** Son code fait trois passes de décalage : 8 bits, 8 bits, puis **quatre** seulement sur le troisième octet. `8 + 8 + 4 = 20` — c'est un convertisseur d'**adresse**, et une adresse fait 20 bits sur cette machine. Une valeur de 24 bits perd son quartet haut **sans que rien ne le signale** : `&345678` revient en `&045678`. Une extension qui lit trois octets doit donc refuser plutôt que tronquer (`LPEEK` rend l'erreur 33, *Data out of range*, celle que `F5C9A` emploie pour le même cas).
 
-**`USRWRK` ne fait que 23 octets.** La zone langage machine commence en `BFD1AH`, mais les paramètres SIO commencent en `BFD31H`. Un programme plus long assemblé là écrase la configuration de la liaison série — vitesse, parité, contrôle des lignes, code de fin de fichier — c'est-à-dire, sur un poste qui transfère par série, le canal lui-même. La panne se manifeste au transfert **suivant**. Charger en `BF000H`, l'adresse qu'emploient `PLINK` et `PLINKC`.
+**`BFD1AH` n'est pas une adresse de chargement.** `USRWRK` y est un **pointeur** de 3 octets vers la zone langage machine (§14), et les paramètres SIO commencent 23 octets plus loin, en `BFD31H`. Un programme assemblé en `BFD1AH` écrase donc le pointeur, puis la configuration de la liaison série — vitesse, parité, contrôle des lignes, code de fin de fichier — c'est-à-dire, sur un poste qui transfère par série, le canal lui-même. La panne se manifeste au transfert **suivant**. Charger en `BF000H`, l'adresse qu'emploient `PLINK` et `PLINKC`, après avoir réservé la zone (§14).
+
+⛔ Une version antérieure de ce paragraphe écrivait « **`USRWRK` ne fait que 23 octets** — la zone langage machine commence en `BFD1AH` ». La mise en garde était juste, sa lecture ne l'était pas : ces 23 octets sont la distance au premier paramètre SIO, et la zone commence à l'adresse que le pointeur **contient**. Corrigé le 2026-09-14, à la source dans `SC62015Disassembler/Data/SystemAddresses.json`, puis `pce500.inc` régénéré — la même erreur que `BASWRK` (§7).
 
 ---
 
