@@ -39,7 +39,7 @@ compris, vaut `1Ah` — le marqueur de fin de fichier. Dossier complet, rapport 
 
 | Élément | Emplacement | Nature de la vérification |
 |---|---|---|
-| `Data/OpcodeTable.json`, `InternalRAMNames.json`, `SystemAddresses.json`, `FCSFunctions.json`, `SystemDataRegions.csv` | `SC62015Disassembler/Data/` | Recoupés sur listings XASM réels (`register.lst` — E. Kako 1990/1992, `TMAP2020.lst` — TORO 1994, `tycom.LST`/`tydos.LST` — J.-F. Albouy 2019) et sur une image ROM PC-E500S réelle (`rom83.bin`). |
+| `Data/OpcodeTable.json`, `InternalRAMNames.json`, `SystemAddresses.json`, `FCSFunctions.json`, `SystemDataRegions.csv` | `SC62015Disassembler/Data/` | Recoupés sur listings XASM réels (`register.lst` — E. Kako 1990/1992, `TMAP2020.lst` — TORO 1994, `tycom.LST`/`tydos.LST` — programmes de T. Yamaguchi, PJ 1988, sources reconstituées et listings de J.-F. Albouy 2019) et sur une image ROM PC-E500S réelle (`rom83.bin`). |
 | `README - PC-E500 Instruction Table.md` | `SC62015Disassembler/Docs/Doc technique/` | Reconstruction complète (table 16×16 + tables détaillées par catégorie) à partir du manuel ESR-L. |
 | `PCE500 Description mémoire.xls.xlsx` | `SC62015Disassembler/Docs/Doc technique/` | Dépouillement en français, daté 2022-12-14, vérifié sur listings réels — base principale de `03-memoire-et-systeme-pc-e500s.md`. |
 | Correction *exec_addr* / *reserved* de l'en-tête objet XASM | `SC62015Disassembler/CLAUDE.md` | Vérifiée directement sur `register.obj`/`tmap.obj`/`vogue.obj` réels. |
