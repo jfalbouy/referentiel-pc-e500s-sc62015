@@ -12,6 +12,8 @@ XASM est un **assembleur croisé absolu** (pas d'édition de liens : les adresse
 | XASM 1.40 | E. Kako | C (ANSI) | 1995-1996 |
 
 > ⚠️ **Discordance non tranchée.** `07-sources-et-bibliographie.md` §3 rattache le site `kako.com` à « 加古静司 / Seiji Kako » ; la bannière et les sources écrivent « **E.** Kako ». Une version antérieure de ce paragraphe donnait « Seiji Kako » pour auteur de XASM, sans source qui le fonde. Ce référentiel retient **E. Kako**, l'initiale que portent le programme et ses listings.
+>
+> **N. Kon est très probablement Narihito Kon** (Tokyo Institute of Technology), l'auteur du compilateur VOGUE (1991-1992), dont le nom complet est établi par quatre documents d'époque (`07` §3). Le rapprochement avec le « N. Kon » de XASM 1.0 et de `PLINK` (1990-1994) tient au même milieu, aux mêmes années, et à ce que son courrier d'août 1992 cite les travaux de « Mr. KAKO » — un pilote de kanji pour PC-E500, adresse à l'université de Gifu. **Aucune source ne l'écrit en toutes lettres** : c'est une inférence forte, pas un fait établi.
 
 Quatre générations coexistent dans l'écosystème du projet :
 

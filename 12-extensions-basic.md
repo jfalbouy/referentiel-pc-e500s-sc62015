@@ -636,6 +636,17 @@ POKE &BFE03,&1A,&FD,&B,TL,TM,TH : CALL &FFFD8
 qui est en dessous reste au BASIC. Pour protéger un module en `BF000H`, il faut donc **3072
 octets** (`&BFC00 - &BF000`). Le menu doit ensuite afficher `[BF000 - BFC00] -> 3072`.
 
+✅ **Un auteur tiers l'écrivait déjà en 1992.** La notice de VOGUE (Narihito Kon, `VOGUE.DOC`)
+réserve la zone de son compilateur, chargé en `$B9800`, par la même porte et le même pointeur :
+
+```basic
+poke &bfe03,&1a,&fd,&b,0,&64,0
+call &fffd8
+```
+
+La taille demandée vaut `&006400` = 25 600 octets, et **`&BFC00 − &6400 = &B9800`** : c'est
+exactement la règle du plafond, retrouvée ici par une source indépendante de la mesure.
+
 ⚠️ `CALL &FFFD8` provoque un petit reset : l'extension est à réinstaller ensuite.
 
 ### Le format des programmes d'essai
