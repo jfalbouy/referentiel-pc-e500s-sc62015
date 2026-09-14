@@ -427,7 +427,9 @@ d9:     equ     00009H          ; device 9, famille 0 -- (cl) ET (ch) d'un coup
 
 Le `mvw` écrit `(cl)` **et** `(ch)` en une fois : `09H` dans le premier, `00H` dans le second —
 et `(ch)` choisit la famille (`0` numérique et chaîne, `1` matrices, `2` statistiques).
-`vogue` procède déjà ainsi, en `0BA788H`.
+`vogue` procède déjà ainsi, en `0BA788H`. La famille `1` a son contrat propre — `BP` ≥ `0A0h`,
+retenue significative, opérandes dans des tableaux BASIC — et elle est mesurée depuis le
+2026-09-14 : voir §17.
 
 **La recette canonique est écrite**, dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`
 (section « APPELER LE DEVICE 9 ») :
@@ -765,15 +767,121 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
     piège du §14 — le jeton d'extension y est figé. `Sharp Basic Converter` sait le produire ;
     reste à vérifier qu'il accepte un token hors des 168 de la ROM.
 
+### Sur les matrices (§17) — chantier suspendu le 2026-09-14, à reprendre
+
+14. **Les matrices depuis le BASIC pur, sans code machine.** `POKE &BFE00,9,1,&4B : CALL &FFFDC`.
+    `BP` vaut `0BEh` au moment d'un `CALL` (mesuré), donc le contrôle `BP ≥ 0A0h` passerait.
+    Mais le calcul écrit alors `080h`-`09Fh` **sans les sauver**. Ces octets sont sous le `BP`
+    du BASIC, donc libres par discipline de pile — c'est une **inférence**. Sauvegarder son
+    travail avant l'essai. Une réponse positive ouvrirait les 29 matrices à tout programme BASIC.
+15. **MA-MZ et les opérations binaires.** `52H`/`53H` avec la lettre en `[BFE03H]` ; `41H`,
+    `42H`, `43H` sur X et Y ; et ce que rend une **erreur de dimension** (le mode MATRIX affiche
+    « IMPOSSIBLE CALCULATION » — quel code dans `A` ?).
+16. **La commande `56H`.** Présente dans la table de répartition, classe « matrice et scalaire »,
+    mais **dans aucun des deux manuels**. Le manuel utilisateur cite cinq opérations scalaires
+    (k·X, k·X⁻¹, X/k, k+X, k−X), le manuel technique n'en numérote que quatre : `56H` = X/k est
+    l'hypothèse naturelle, à mesurer avec `X` = 25 et un tableau connu.
+17. **Les statistiques par le tableau `MD`.** Le manuel allemand (livre p. 138) dit que la
+    matrice `MD` partage son tableau avec les données d'échantillon des statistiques. Ce serait
+    la réponse à la question laissée ouverte sur la famille `(ch)=2` : comment ses données sont
+    fournies. À vérifier dans le code de `0E8F74h` — y chercher le nom `M`,`D` fabriqué comme
+    en `SUB_E813E` — avant toute sonde.
+
 ---
 
-## 17. Sources
+## 17. Les matrices — device 9, famille `(ch)=1`
+
+Ouvert le 2026-09-14 et **suspendu volontairement après une première mesure** : le contrat est
+lu sur trois sources indépendantes, deux commandes sont éprouvées, et le reste est inventorié
+pour la reprise (pistes 14 à 17 du §16).
+
+### Ce que sont les matrices : des tableaux BASIC
+
+| Fait | Le code (`rom83`) | Les manuels |
+|---|---|---|
+| X, Y, M et MA-MZ **sont** les tableaux BASIC `X(*,*)`, `Y(*,*)`, `M(*,*)`, `MA(*,*)`-`MZ(*,*)`, en simple précision | `SUB_E813E` fabrique le nom — lettre(s), `21h` `!`, `28h` `(` — et le fait chercher dans la table des variables par `SUB_FACEB` | utilisateur allemand, livre p. 147 : « *im gleichen Bereich wie die Feldvariablen X (\*,\*), Y (\*,\*), M (\*,\*) und MA (\*,\*) - MZ (\*,\*)* » |
+| l'élément X(i,k) est le BASIC `X(i-1,k-1)` | — | idem |
+| le **scalaire** k des commandes `46H`-`49H` est **lu** dans la **variable simple** `X` | `0E7DB6h` : `mv a,058h` / `callf SUB_FB334`, qui calcule l'adresse d'une variable fixe : `(datbas)` + `[+32h]` + 5 + (lettre − `41h`) × 12 | technique p. 81 : « *CALL after entering scholar value in X* » |
+| le **déterminant** (`4CH`) est **écrit** dans la variable `X` | `0E7D2Ch`, chemin propre à cette seule commande : `call SUB_E3235` / `mv a,058h` / `callf SUB_FB334` / `callf SUB_FD65F` | technique p. 81 : « *Answer enters in x* » |
+| la lettre A-Z de `52H`/`53H` se pose en `[BFE03H]` | `0E7D9Dh` n'accepte que `41h`-`5Ah`, et la range en `(0B9h)` | technique p. 82, colonne « A-Z » |
+| le mode MATRIX de la ROM **ne passe pas** par l'IOCS | `0E135Dh` saute directement dans les classes d'après `[0BFEE3h]` | — |
+
+### Les six classes, lues dans la table de répartition
+
+L'entrée `0E7CE9h` range `IL − 41h` en `[0BFEE3h]`, puis une table d'octets (`DB_E7D87`) donne la
+classe de chacune des 22 commandes `41H`-`56H` :
+
+| Classe | Nature | Commandes |
+|---|---|---|
+| `31h` | sur X seule | `45H` inverse · `4BH` transposée · `4CH` déterminant · `4DH` changement de signe · `4EH` carré |
+| `32h` | X avec Y ou M | `41H` X+Y · `42H` X−Y · `43H` X·Y · `44H` X·Y⁻¹ (« Division ») · `51H` X+M→M · `54H` système d'équations · `55H` résidu |
+| `53h` | X avec le scalaire k | `46H` k+X · `47H` k−X · `48H` k·X · `49H` k·X⁻¹ · `56H` *(non documentée)* |
+| `54h` | X ↔ M | `4FH` X→M · `50H` M→X |
+| `52h` | X ↔ MA-MZ | `52H` X→MA-MZ · `53H` MA-MZ→X |
+| `58h` | X ↔ Y | `4AH` échange |
+
+*Recoupement : les numéros et les libellés viennent du manuel technique p. 81-82, le sens exact des
+opérations du manuel utilisateur p. 142-144, la classe du code.*
+
+### Le contrat d'appel
+
+```asm
+        mv      x,sauve
+        mv      i,00040H
+        mvl     [x++],(080H)    ; SAUVER 080h-0BFh : le calcul y travaille
+        mv      (bp_ram),0A0H   ; au moins 0A0h, sinon erreur 60
+        mvw     (cl),00109H     ; device 9 ET famille 1, en une instruction
+        mv      il,04BH         ; transposee
+        callf   iocs_call
+        ; retenue ARMEE = erreur, et A porte alors un code BASIC
+        ; ... puis rendre 080h-0BFh, U et BP
+```
+
+| Règle | Pourquoi |
+|---|---|
+| **`BP` ≥ `0A0h`** | `0E7CEFh` : `cmp (bp_ram),0A0h` → erreur 60 |
+| **sauver `080h`-`0BFh` soi-même** | le calcul pose `BP` = `080h`, emploie `080h`-`0BFh`, et ne sauve que `0A0h`-`0BFh` (en `BFFD8H`, et `BP` en `BFFD0H`). À l'entrée d'une fonction, `BP` vaut `096h` : le cadre vivant du BASIC tombe dans la zone non sauvée |
+| **la retenue fait foi** | la queue d'erreur (`0E7D46h`-`0E7D6Bh`) traduit les codes internes en codes BASIC 60, 21, 20 ou 22, puis `sc` / `retf` — l'inverse de la famille 0, dont le guichet fait `rc` / `retf` |
+| **`A` ne se lit que si la retenue est armée** | la sortie de succès ne pose pas `A` : c'est un reste du calcul |
+
+### ✅ Mesuré — `Samples/DEVICE9/MATTEST.ASM`, 2026-09-14
+
+La sonde relève retenue, `A` et `BP` à des **adresses fixes** en tête du code (`&BF002`-`&BF005`) ;
+`MATTEST.BAS` fournit les tableaux.
+
+| Essai | Affiché | Ce que cela établit |
+|---|---|---|
+| transposée `4BH` de `DIM X(1,2)` = 1 2 3 / 4 5 6 | `CY 0  A 0  BP 190` puis `T 4  6` | la famille 1 répond par l'IOCS ; `DIM X(1,2)` est bien le tableau que la ROM cherche sous le nom `X!(` ; `X(0,1)` = 4 et `X(2,1)` = 6 existent : le tableau a été **recréé en 3×2** |
+| déterminant `4CH` de 2 1 / 1 3 | `CY 0  A 20` puis `DET 5` | le résultat va dans la variable simple `X`, **qui coexiste** avec le tableau `X(,)` ; `ERASE` puis `DIM` redonnent un tableau que la ROM retrouve |
+
+⚠️ **« `A 20` » avec `CY 0` n'est pas une erreur** — c'est la règle du tableau précédent, vérifiée
+sur la machine.
+
+✅ **`BP` vaut 190 (`0BEh`) au moment d'un `CALL`**, contre 150 (`096h`) à l'entrée de `MOD` : une
+fonction est appelée **pendant** l'évaluation d'une expression, une instruction `CALL` non.
+
+### Ce qu'il faut savoir avant d'écrire une extension matricielle
+
+- **`RUN`, `CLEAR`, `NEW`, `ARUN` et `ERASE` effacent les matrices** (manuel utilisateur p. 147) :
+  ce sont des variables. Un programme qui les emploie doit les dimensionner **après** son `RUN`,
+  et le manuel imprime ses matrices par `GOTO`, jamais par `RUN`.
+- **La mémoire** : (lignes × colonnes × 7 + 10) octets par matrice, et le calcul en crée une
+  **intermédiaire** — deux pour l'inverse et les systèmes (manuel utilisateur p. 147).
+- **Simple précision seulement**, et des résultats approchés sur une matrice presque singulière :
+  le manuel en donne un exemple, et recommande `RESID` pour évaluer l'erreur d'un système.
+- **`MD` est aussi le tableau des données statistiques** (p. 138) — piste 17.
+
+---
+
+## 18. Sources
 
 - **`Nx commandes BASIC.docx`** — SynologyDrive, `Sharp PC E500S\01- Manuels et Guides\01- Basic\`. Traduction française d'un document allemand. **Dix-sept lignes qui spécifient le mécanisme** : les deux crochets, le format des deux listes, les bits 7 et 6, l'obligation de `RETF`, la retenue comme statut d'erreur, `(BP+0)` comme statut BASIC, et `X` comme pointeur de programme en entrée/sortie. C'est la source de référence ; tout le reste de ce document la complète par la lecture de la ROM et la mesure.
 - **`PC-E500 systemhandbuch.pdf`** et sa traduction `Systemhandbuch_PC-E500_traduction_FR.docx` (`Sharp Basic Converter/Documentation/`) — le préfixe `0FEH` des tokens, et une troisième confirmation de la doctrine PRE (*« Die übliche Adressierungsart ist (BP+n), sie erfordert keinen [PRE] »*).
 - **`BASCOM`** (TORO, 1994) — `SC62015Disassembler/Samples/BASCOM/`. Seul exemple du corpus, et seul témoin de l'installation : douze mots-clés, mais **trois routines seulement**, toutes des instructions.
 - **Rétro-ingénierie de `rom83.bin`** — les résolveurs `F58E5H` et `F590BH`, la recherche `F593DH`, le tokeniseur `F4413H`/`F448BH`, le gabarit `BAS_PEEK` (`F9F44H`) et les trois services de conversion. Détail dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`.
 - **Mesures sur PC-E500S et PockEmul**, septembre 2026 — la contrainte de nommage, la limite des 20 bits, le contrat de `X`, et la validation de `LPEEK` et `WPEEK`.
+- **`SC62015Disassembler/Samples/DEVICE9/`** — les sondes du Function Driver : `SQR`, `ADDTEST`, `DIVTEST` (famille 0, §13) et `MATTEST` (famille 1, §17). Chaque source consigne en en-tête le résultat observé et sa lecture.
+- **Manuels Sharp, pour les matrices** — technique, livre pp. 79-82 (PDF pp. 83-86) : les tables des trois familles ; utilisateur allemand `PC-E500S-DE.pdf`, livre pp. 138-148 (PDF pp. 146-156) : le mode MATRIX, le rangement dans les tableaux BASIC, la mémoire et les erreurs.
 - **`SC62015Disassembler/Samples/BASEXT/`** — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`), 530 octets, validés sur machine le 2026-09-05. Son `README.md` porte le journal des cinq défauts successifs de `MOD` et de ce que chacun a coûté.
 
 ---
@@ -793,8 +901,11 @@ refus attendus — erreurs 21, 33, 33, 10 et 90.
 plusieurs arguments (§9, qui était le premier point resté ouvert), le compte des cadres mesuré
 (§10), la distinction `SHL`/`ROL` (§11), l'idempotence de l'installation (§12), la route IOCS du device 9 (§13), les pièges d'usage (§14) et la méthode de mise au point (§15).
 
-**Reste ouvert** : le retour d'une **chaîne** plutôt que d'un nombre, et les onze autres pistes
-du §16.
+**Le 2026-09-14** : la famille **matrices** du device 9 (§17) — contrat lu sur le code et les deux
+manuels, transposée et déterminant mesurés par `MATTEST`, puis chantier suspendu à la demande.
+
+**Reste ouvert** : le retour d'une **chaîne** plutôt que d'un nombre, et les quinze autres pistes
+du §16, dont quatre sur les matrices et les statistiques (14 à 17).
 
 ⛔ **Une correction du 2026-09-06, et c'est la plus instructive.** La première rédaction du
 §13 concluait à une « impasse du device 9 ». Elle était fausse : `Samples/DEVICE9/SQR.ASM`

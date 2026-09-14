@@ -40,7 +40,7 @@
 
 *(Table de reconstruction reprise et traduite de `README - PC-E500 Instruction Table.md`, elle-même issue du manuel ESR-L. Croisée avec le projet indépendant [gikonekos/sc62015-opcode-reference](https://github.com/gikonekos/sc62015-opcode-reference), voir `07-sources-et-bibliographie.md`.)*
 
-¹ Corrigé par rapport à la table source, qui indique par erreur `MVW[r3],(n)` à cette case (`0xEA`) — `Data/OpcodeTable.json`, vérifié par les 249 tests du désassembleur, confirme `MVP` (mnémonique cohérent avec la colonne, opérandes 24 bits).
+¹ Corrigé par rapport à la table source, qui indique par erreur `MVW[r3],(n)` à cette case (`0xEA`) — `Data/OpcodeTable.json` confirme `MVP` (mnémonique cohérent avec la colonne, opérandes 24 bits). Cette table est vérifiée depuis à trois niveaux par `SC62015Disassembler` (972 tests en septembre 2026) : réencodage de chaque instruction à l'octet près, reproduction de 25 listings XASM (18 764 instructions, 0 divergence), et réassemblage par XASM de 34 programmes **identiques à l'octet** ; le manuel ESR-L de Sharp la confirme case pour case (`Docs/Synthese/Jeu-d-instructions.md`).
 
 ## 3. Sommaire par mnémonique (65 mnémoniques, 256 opcodes)
 
@@ -63,14 +63,14 @@
 | `ADC`/`SBC` | idem + retenue | Addition/soustraction avec retenue entrante. |
 | `ADCL`/`SBCL` | mémoire, en boucle | Addition/soustraction avec retenue, propagée octet par octet sur `I` itérations. |
 | `DADL`/`DSBL` | mémoire, en boucle | Addition/soustraction **décimale** (BCD) avec retenue, multi-octets. |
-| `PMDF` | `(m),n` / `(n),A` | Modification BCD empaquetée (« packed BCD modify »). |
+| `PMDF` | `(m),n` / `(n),A` | Ajoute `n` (ou `A`) à `(m)` **sans toucher aux drapeaux** (`C`, `Z` inchangés). ⚠️ Le relevé communautaire le dit « BCD packed » ; la ROM l'emploie **en binaire** pour déplacer `BP` d'un cadre — `pmdf (bp_ram),0F1h` retire 15, et c'est mesuré (`BP` 150 → 135, `12-extensions-basic.md` §10). |
 | `CMP`/`CMPW`/`CMPP` | 8/16/24 bits | Comparaison (soustraction sans stockage du résultat), affecte `C`/`Z`. |
 | `TEST` | 8 bits | ET logique sans stockage, affecte `Z`. |
 | `AND`/`OR`/`XOR` | immédiat, mémoire, registre A | Opérations logiques bit à bit, affectent `Z`. |
 | `SWAP` | `A` | Échange les deux nibbles de `A`. |
 | `INC`/`DEC` | registre ou `(n)` | Incrémente/décrémente de 1, affecte `Z`. |
-| `ROR`/`ROL` | `A` ou `(n)` | Rotation à travers `C`. |
-| `SHR`/`SHL` | `A` ou `(n)` | Décalage à travers `C`. |
+| `ROR`/`ROL` | `A` ou `(n)` | Rotation **circulaire** : huit rotations rendent l'octet intact. ⛔ Une version antérieure écrivait « à travers `C` », comme pour `SHR`/`SHL` — ce qui a fait rendre `0` à une extension pour toutes les valeurs. La ROM tranche, preuves en `12-extensions-basic.md` §11. |
+| `SHR`/`SHL` | `A` ou `(n)` | Décalage **à travers `C`** — c'est ce qui les rend chaînables octet par octet pour un décalage multi-octets (la ROM enchaîne cinq `shr` en `0EEBB8H`). Ils ne consultent pas `I`. |
 | `DSRL`/`DSLL` | `(n)`, en boucle | Décalage décimal (BCD) multi-octets, adresses croissantes/décroissantes. |
 | `PUSHU`/`POPU` | `A,IL,BA,I,X,Y,F,IMR` | Empilement/dépilement sur la pile **utilisateur** `U`. |
 | `PUSHS`/`POPS` | `F` | Empilement/dépilement des flags sur la pile **système** `S`. |
@@ -82,7 +82,7 @@
 | `IR` | — | Interruption logicielle. |
 | `RESET` | — | Reset logiciel. |
 | `PRE` | 15 combinaisons | Préfixe d'adressage interne composé (voir `01-architecture-cpu-sc62015.md` §3.3) — n'est pas une instruction exécutable en soi. |
-| `DB` | — | Pseudo-entrée pour les deux positions d'opcode non définies (`0x02` colonne, `0xBF`) ; illégal à l'exécution. |
+| `DB` | — | Pseudo-entrée pour les deux opcodes non définis, **`20H` et `BFH`** (les deux cases vides de la table §2) ; illégal à l'exécution. Les 254 autres sont définis. |
 
 ## 4. Détail de la famille `MV`/`MVW`/`MVP`/`MVL`/`MVLD` (transferts de données)
 

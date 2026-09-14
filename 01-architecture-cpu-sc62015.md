@@ -134,7 +134,13 @@ Le SC62015 possède **8 sources d'interruption**, mais un **unique vecteur maté
 |---|---|---|---|
 | Registres | Tous conservés | Tous conservés | `PC` recharge le vecteur reset ; les autres registres sont conservés |
 | Flags C/Z | Indéfinis | Indéfinis | Conservés |
-| Mémoire interne | `USR` (F8H) bits 0-2/5 remis à 0 ; `SSR` (FFH) bit 2 et `USR` bits 3-4 mis à 1 ; le reste est conservé | Identique à HALT | `ACM`/`UCR`/`USR` bits 0-2/5/`IMR`/`SCR` remis à 0 ; `SSR` bit 2 et `USR` bits 3-4 mis à 1 ; le reste conservé |
+| Mémoire interne | `USR` (F8H) bits 0-2/5 remis à 0 ; `SSR` (FFH) bit 2 et `USR` bits 3-4 mis à 1 ; le reste est conservé | Identique à HALT | `AMC` bit 7 (`AME`)/`UCR`/`USR` bits 0-2/5/`IMR`/`SCR` remis à 0 ; `SSR` bit 2 et `USR` bits 3-4 mis à 1 ; le reste conservé |
+
+> ⚠️ **Le manuel écrit « `ACM` (FEH) bit 7 »** à la page 34 : c'est une double coquille, lettres
+> **et** chiffres transposés, pour `AMC` (`EFH`) bit 7 — le nom `ACM` n'apparaît nulle part
+> ailleurs dans le manuel, et `FEH` est `LCC`. Tranché dans
+> `SC62015Disassembler/Docs/Synthese/Registres-materiels.md` (§ `AMC`), avec la routine de la ROM
+> qui dimensionne la carte (`0F0E7Bh`).
 
 ## 7. Voir aussi
 

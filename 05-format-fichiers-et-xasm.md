@@ -4,13 +4,22 @@
 
 ## 1. Généalogie de l'outil
 
-XASM est un **assembleur croisé absolu** (pas d'édition de liens : les adresses sont fixées par `ORG`) pour le CPU ESR-L/SC62015, écrit à l'origine par **加古静司 / Seiji Kako** (auteur également du désassembleur ESR-L historique `DISASM12` et de l'outil `disbacon`/`bacon`, cf. `06-ecosysteme-outils.md` et `07-sources-et-bibliographie.md`), à partir d'une version Turbo Pascal, puis amélioré (hachage des symboles). Trois générations coexistent dans l'écosystème du projet :
+XASM est un **assembleur croisé absolu** (pas d'édition de liens : les adresses sont fixées par `ORG`) pour le CPU ESR-L/SC62015. Sa bannière dit « *(c)1990-1996 N.Kon and E.Kako* », et la généalogie donnée par `xasm2026-4/README.md` est :
+
+| Version | Auteur | Langage | Années |
+|---|---|---|---|
+| XASM 1.0 | N. Kon | Turbo Pascal | 1990-1993 |
+| XASM 1.40 | E. Kako | C (ANSI) | 1995-1996 |
+
+> ⚠️ **Discordance non tranchée.** `07-sources-et-bibliographie.md` §3 rattache le site `kako.com` à « 加古静司 / Seiji Kako » ; la bannière et les sources écrivent « **E.** Kako ». Une version antérieure de ce paragraphe donnait « Seiji Kako » pour auteur de XASM, sans source qui le fonde. Ce référentiel retient **E. Kako**, l'initiale que portent le programme et ses listings.
+
+Quatre générations coexistent dans l'écosystème du projet :
 
 | Génération | Dossier | Nature |
 |---|---|---|
 | **XASM 1.40** | `XASM Origine/` | Original historique en C (DOS), syntaxe et mnémoniques de référence. |
-| **xasm2026-1 / xasm2026-1-2** | `xasm2026-1-2/` | Port maintenu en C11 moderne (GCC/CMake), sorties étendues (Intel HEX, S-Record, MAP, dépendances, UU, dump HxD), compatibilité **octet par octet** vérifiée contre l'original. |
-| **xasm2026-4** | `xasm2026-4/` | Réécriture C# (.NET 8), non-régression **bit-exacte** contre `xasm2026-1`. |
+| **xasm2026-1 / xasm2026-1-2** | `xasm2026-1-2/` | Port maintenu en C11 moderne (GCC/CMake), sorties étendues (Intel HEX, S-Record, MAP, dépendances, UU, dump HxD), compatibilité **octet par octet** vérifiée contre l'original. C'est le « moteur C » dont les bornes sont décrites au §2. |
+| **xasm2026-4** | `xasm2026-4/` | Réécriture C# (.NET 8), non-régression **bit-exacte** contre `xasm2026-1`. Reproduit en plus le **préprocesseur de l'assembleur A62 (N. Kon)** — `rel` et la table de relocation — ce qui assemble telles quelles les sources des drivers `ssfdc120` et `PLINKC`. Documentation complète : `xasm2026-4/Documentation/Documentation_XASM2026-4_PC-E500S.md`. |
 
 ## 2. Syntaxe source
 
@@ -79,34 +88,58 @@ Extensions `xasm2026-1`/`xasm2026-1-1` : `REPEAT`/`ENDR`, `IFEQ`/`IFNE`/`IFGT`/`
 
 ## 4. Ligne de commande et sorties
 
+Table de `xasm2026-4` (`xasm2026-4/README.md`, analysée dans `src/CommandLineOptions.cs`). Chaque sortie est **optionnelle et explicite** ; le nom peut être collé à l'option (`-Lfoo.lst`) ou séparé par une espace, et s'il est omis le nom du source est repris avec la nouvelle extension.
+
 | Option | Fichier | Contenu |
 |---|---|---|
 | `-O[f]` | `.obj` | Objet principal (voir §5 pour les formats). |
 | `-L[f]` | `.lst` | Listing assemblé (adresses, octets, messages). |
-| `-E` | — | Listing d'erreurs seul (sans partie objet). |
-| `-S` | — | Ajoute la table des symboles au listing. |
-| `-T[type]` | — | Choix du format objet historique : `Z` (ZSH texte), `F` (FTX), `B` (binaire brut), `H` (hex ASCII), absent = en-tête XASM 16 octets. |
+| `-E` | `.err` | Rapport d'erreurs. |
+| `-S` | — | Ajoute la table des symboles au listing (avec `-L`). |
+| `-U` | — | Ajoute la table des **références croisées** au listing (avec `-L`). |
+| **`-K`** | — | **Listing : ne garde, des fichiers inclus, que les constantes `EQU` réellement utilisées** (avec `-L`). Voir ci-dessous. |
+| `-H` | — | Désactive le hachage pour le listing des symboles. |
+| `-T[type]` | — | Format objet historique : `Z` (ZSH texte), `F` (FTX), `B` (binaire), `H` (hexadécimal), autre = binaire + en-tête XASM 16 octets. |
 | `-I[f]` | `.hex` | Intel HEX. |
 | `-M[f]` | `.s19` | Motorola S-Record (S1/S9). |
 | `-P[f]` | `.map` | Sections et symboles. |
 | `-D[f]` | `.d` | Dépendances façon *make*. |
-| `-B[f]` | `.uu` | Encodage BASIC auto-décodable pour transfert vers PC-E500S. |
+| `-B[f]` | `.uu` | Programme BASIC auto-décodable pour transfert vers PC-E500S. |
 | `-X[f]` | `.txt` | Dump hexadécimal façon HxD. |
-| `-C`/`-W`/`-V`/`-R` | console | Compteur de lignes / warnings / colonne d'erreur / rapport de taille par `SECTION`. |
+| `-C` | console | Compteur de lignes. |
+| `-W` | console | Avertissements. |
+| `-V` | console | Mode verbeux : ajoute la colonne aux diagnostics. |
+| `-R` | console | Rapport de taille par `SECTION`. |
+| `-?` | console | Aide. |
 
-> ⚠️ **Le nom de fichier VOYAGE DANS l'enveloppe uuencode, et il n'est pas celui que `-O`
-> annonce.** La sortie `-B` porte une ligne `begin 644 NOM.EXT` qu'un décodeur standard lit
-> **pour choisir le fichier à écrire** : renommer le `.uu` après coup ne change donc rien à ce
-> qui sortira à l'autre bout.
+### `-K` — un listing lisible malgré `pce500.inc`
+
+Inclure `pce500.inc` (près de 280 `EQU`) noie le `.lst`. **`-K`** (avec `-L`) n'y conserve, **des fichiers inclus**, que les constantes `EQU` effectivement **référencées** par le programme ; tout ce qui n'émet pas d'octet et n'est pas une constante utilisée est masqué, **la source principale restant intégrale**. Sur `example.asm`, le listing passe de 357 à 36 lignes.
+
+C'est un **filtre de listing pur** : l'objet et toutes les autres sorties sont identiques avec ou sans `-K`. Les sorties de référence des tests de `xasm2026-4` étant produites sans `-K`, elles ne bougent pas.
+
+### La commande canonique pour un programme destiné à la machine
+
+```
+xasm2026-4 NOM.ASM -ONOM.OBJ -L -S -B -K
+```
+
+C'est celle des sondes de `SC62015Disassembler/Samples/DEVICE9/` et du module `Samples/BASEXT/`.
+
+> ⚠️ **Le nom de fichier VOYAGE DANS l'enveloppe uuencode — et deux noms distincts sont en jeu.**
 >
-> Or **`xasm2026-4` nomme le `.uu` d'après le `.asm`, pas d'après `-O`** — il sort en minuscules,
-> là où le Sharp et l'émulateur nomment en **majuscules 8.3**. Pour un artefact destiné à la
-> machine, il faut donc **reconstruire** le `.uu` avec le bon `-O` (`-OTYDOS.SYS`), pas le
-> renommer, puis renommer le fichier lui-même.
+> | Ce qui est nommé | D'après quoi | Exemple, `xasm2026-4 MATTEST.ASM -OMATTEST.OBJ -B` |
+> |---|---|---|
+> | la ligne `begin 644 NOM.EXT` **dans** le `.uu` | **`-O`** | `begin 644 MATTEST.OBJ` |
+> | le `FNAME$` du décodeur BASIC embarqué | `-O`, cadré en 8.3 majuscules | `FNAME$="MATTEST .OBJ"` |
+> | le **fichier** `.uu` lui-même | le **source**, extension en **minuscules** | `MATTEST.uu` |
 >
-> Le `FNAME$` du décodeur BASIC embarqué par `-B`, lui, est déjà correct : il cadre le nom en
-> 8.3 majuscules (`"TYDOS   .SYS"`). C'est l'en-tête uuencode seule qui suit le nom du source.
-> Établi en septembre 2026 sur les douze artefacts de TY-DOS.
+> Un décodeur PC lit la ligne `begin` **pour choisir le fichier à écrire** : renommer le `.uu` ne change donc rien à ce qui sortira à l'autre bout. Sans `-O` explicite, cette ligne porte le nom du source en minuscules (`begin 644 TYDOS.obj`), alors que le Sharp et l'émulateur nomment en **majuscules 8.3**. D'où les deux gestes :
+>
+> 1. **reconstruire avec `-ONOM.EXT` en majuscules** — jamais renommer un `.uu` mal nommé ;
+> 2. **renommer ensuite le fichier `.uu` en `.UU`**, et sous Windows **en deux temps** (`NOM.uu` → `NOM.tmp` → `NOM.UU`) : un changement de casse seul y est ignoré.
+>
+> Établi en septembre 2026 sur les douze artefacts de TY-DOS, puis sur les sondes de `DEVICE9` (commit « les cinq autres .uu portaient un nom en minuscules »).
 
 ## 5. Formats de fichier objet
 
@@ -130,13 +163,15 @@ FF 00 06 01 10 61 38 00 00 98 0B FF FF FF 00 0F
 
 ### 5.2 Lecture (désassembleur) — formats reconnus
 
-Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur-ensemble de formats rencontrés dans l'écosystème PC-E500 :
+Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur-ensemble de formats rencontrés dans l'écosystème PC-E500.
+
+> ⚠️ **L'hex ASCII est un transport, pas un format de contenu.** Une version antérieure de ce tableau lui donnait un en-tête de 6 octets, comme si le texte décodé était toujours du `-TB` : `Samples/tred111/tred.hex` décode en un objet **IOCS** de 16 octets d'en-tête, identique à l'octet à `TRED.obj`. Le format est donc redétecté après décodage.
 
 | Format | Option | Détection automatique | Taille en-tête | Adresse de base |
 |---|---|---|---|---|
 | IOCS (BLOAD) | `--format iocs` | Signature `FF 00 06 01 10` | 16 octets | Dans l'en-tête. |
 | Binaire compact | `--format tb` | Cohérence taille (3o) + adresse (3o) | 6 octets | Dans l'en-tête. |
-| Hex ASCII | `--format hex` | Contenu ASCII hexadécimal pur | 6 octets décodés | Dans l'en-tête. |
+| Hex ASCII | `--format hex` | Contenu ASCII hexadécimal pur | celui du contenu **décodé**, redétecté | Dans l'en-tête. |
 | Image ROM | `--format rom` | Signature `10 12 40 …` ou taille caractéristique | 32 octets (0 si image plate) | `--base` (défaut `C0000`). |
 | Binaire brut | `--format raw` | Aucune | 0 | `--base` (défaut `0`). |
 
@@ -172,3 +207,5 @@ Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur
 - `06-ecosysteme-outils.md` — comment XASM Origine/xasm2026-1-2/xasm2026-4 et `SC62015Disassembler` se répondent (assembleur ↔ désassembleur, non-régression bit-exacte).
 - `02-jeu-instructions.md` — mnémoniques reconnus par XASM (liste extraite de sa table de hachage), recoupée avec la table d'opcodes.
 - `Docs/Doc technique/Documentation_XASM_PC-E500S.md` (dans `SC62015Disassembler`) — version complète, avec exemples de macros/structures/sections et le détail du workflow VS Code.
+- `xasm2026-4/README.md` et `xasm2026-4/Documentation/Documentation_XASM2026-4_PC-E500S.md` — la référence de la génération maintenue, dont les options `-U`, `-K` et le dialecte A62.
+- `12-extensions-basic.md` §14 — le format des programmes BASIC d'essai (`CRLF`, majuscules, noms 8.3), qui accompagnent un objet sur la machine.

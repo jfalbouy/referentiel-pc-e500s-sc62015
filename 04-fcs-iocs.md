@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-> Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Ce fichier **complète** ce JSON : le manuel documente 17 fonctions FCS (`00H`-`10H`) alors que le JSON du désassembleur n'en couvrait que 9 (reconstruites depuis des listings) ; les codes manquants sont ajoutés ici avec leur source.
+> Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
 Le PC-E500S offre trois niveaux d'entrée/sortie, du plus haut niveau (portable, simple) au plus bas (rapide, dépendant du matériel) :
 
@@ -128,7 +128,7 @@ Bits d'attribut (`+4`) :
 | `10H`-`1FH` | Traitement fichier des périphériques bloc standard (utilisé depuis FCS) — lecture/écriture secteur, etc. |
 | `20H`-`3FH` | Traitement fichier des périphériques spéciaux (utilisé depuis FCS) ; `3FH` = formatage. |
 | `40H` | Initialisation, commande commune à tous les drivers. |
-| `41H`-`7FH` | Fonctions propres à chaque périphérique (cf. `Data/FCSFunctions.json`, ex. `0x22`, `0x47` = `compress_memory`). |
+| `41H`-`7FH` | Fonctions propres à chaque périphérique, **choisies par le numéro de device en `(cl)`** : `43H` vaut `key_read` sur le clavier, `printer_check` sur l'imprimante, `block_transfer` sur la carte mémoire, `basic_exec` sur le driver système ; `47H` vaut `condense` (compactage) sur la carte mémoire, device 6 (cf. `Data/FCSFunctions.json`). |
 | `80H`-`FFH` | Réservé. |
 
 Codes d'erreur (registre `A`, `C=1`) selon la plage de commande :
@@ -173,8 +173,40 @@ Illustration des fonctions « `41H`-`7FH` propres au périphérique », ici pour
 
 Le manuel documente de la même façon chaque autre driver standard (clavier, SIO, imprimante, cassette, carte mémoire, disquette — voir la liste des en-têtes en `03-memoire-et-systeme-pc-e500s.md` §7) ; le détail complet des ~10 drivers dépasse le cadre de ce résumé et reste consultable dans le manuel original (`Docs/Doc technique/TechnicalReferenceManualPC-E500.pdf` et sa version mise en forme dans `Mise en forme documents SHARP/`).
 
+### 2.5 Le device 9 — Function Driver, la bibliothèque mathématique
+
+*Manuel technique pp. 79-82 du livre (PDF pp. 83-86 de `TechnicalReferenceManualPC-E500.pdf`, le bon exemplaire). Le manuel le dit « Device unable to use » : pas de lecteur, pas de fichier — les commandes `08H`-`28H` sont des erreurs, et tout passe par `41H`-`7FH`.*
+
+`(cl)` = `9` choisit le device et **`(ch)` choisit la famille**. Les trois familles réutilisent les **mêmes** numéros de commande : `mvw (cl),00009h` écrit les deux octets en une instruction pour la famille 0, `mvw (cl),00109h` pour la famille 1.
+
+| `(ch)` | Famille | Opérandes | Retenue au retour | État |
+|---|---|---|---|---|
+| `0` | **numérique et chaîne** — comparaisons `41H`-`46H`, arithmétique `47H`-`4BH`, fonctions `4CH`-`5BH`, comparaisons de chaînes `70H`-`75H`, `ASC`/`CHR$`/`STR$`/`VAL` `76H`-`79H`, conversions `7EH`/`7FH` | `X` en `(bp+0)`..`(bp+14)`, `Y` en `(bp+15)`..`(bp+29)` ; sens **« `Y op X` → `X` »** ; une chaîne vit sur la pile `U` et la commande la **consomme** | ⛔ **n'indique RIEN** : la sortie d'erreur du guichet (`0EF076h`) fait `rc` / `retf` | **mesuré** — `SQR`, `ADDTEST`, `DIVTEST` (2-6 septembre 2026) |
+| `1` | **matrices** — `41H`-`56H` : opérations sur X et Y, inverse, transposée, déterminant, scalaires, X↔M, X↔MA-MZ, systèmes d'équations | les **tableaux BASIC** `X(,)`, `Y(,)`, `M(,)`, `MA(,)`-`MZ(,)` en simple précision ; le scalaire est **lu** dans la variable simple `X`, le déterminant y est **écrit** ; la lettre A-Z de `52H`/`53H` en `[BFE03H]` | **armée = erreur**, code BASIC dans `A` (60, 21, 20 ou 22) ; `A` n'a pas de sens si elle est claire | **mesuré** sur `4BH` et `4CH` — `MATTEST` (14 septembre 2026) |
+| `2` | **statistiques et régressions** — `41H`-`47H` | paramètres en `[BFE03H]`/`[BFE04H]` (« 0-8 X sequence », « 0-8 Y sequence ») ; l'alimentation des données n'est pas établie | armée = erreur | **lu, non mesuré** ; le manuel **barre** `43H`-`47H`, et la ROM ne laisse passer que `41H` |
+
+**Contraintes des familles 1 et 2**, lues dans le code (`0E7CE9h` et `0E8F74h`) :
+
+- **`BP` doit valoir au moins `0A0h`**, sinon erreur 60. Le calcul travaille en RAM interne `080h`-`0BFh` avec `BP` = `080h`, et ne sauve lui-même que `0A0h`-`0BFh` (en `BFFD8H`, et `BP` en `BFFD0H`). Un appelant dont le cadre vit sous `0A0h` doit donc sauver `080h`-`09Fh` lui-même.
+- Mesuré : `BP` vaut **`0BEh`** (190) au moment d'un `CALL` depuis le BASIC, et **`096h`** (150) à l'entrée d'une fonction d'extension appelée pendant l'évaluation d'une expression.
+
+⛔ **Famille 0 : la division par zéro déplace `BP` de +30, en silence**, et cela s'accumule. Qui appelle `div` teste son diviseur lui-même, avant l'appel.
+
+Détail, mesures et pièges : `12-extensions-basic.md` §13 (famille 0) et §17 (matrices). Recette d'appel commentée : `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`, section « APPELER LE DEVICE 9 ».
+
+### 2.6 Trois portes vers l'IOCS
+
+| Porte | Convention | Ce que fait la ROM |
+|---|---|---|
+| `callf iocs_call` (`FFFE8H`) | depuis le code machine : `(cl)`, `(ch)`, `IL`, puis les registres de la commande | répartition vers le driver par la chaîne d'en-têtes |
+| `CALL &FFFDC` (`iocs_call3`) | **depuis le BASIC** : `POKE &BFE00,cl,ch,il` | `0EF01Ah` : `mv il,[0BFE02h]` / `mvw (cl),[0BFE00h]` / `callf iocs_call` |
+| `CALL &FFFD8` (`secure_work_call`) | depuis le BASIC : `POKE &BFE03,` adresse (3 o) `,` valeur (3 o) | `0F964Fh` : relit les six octets, puis **IOCS `042H` `secure_work`** du device 8 |
+
+> ⚠️ `CALL &FFFDC` ne transmet que trois registres : il ne convient qu'aux commandes qui n'attendent rien d'autre, ou dont les opérandes sont déjà en place — c'est le cas des matrices, rangées dans des tableaux BASIC. **Qu'il suffise effectivement pour la famille 1 n'est pas encore mesuré** (`12-extensions-basic.md` §16).
+
 ## 3. Voir aussi
 
 - `03-memoire-et-systeme-pc-e500s.md` §7 — chaîne des en-têtes IOCS installés par défaut et leurs points d'entrée.
+- `12-extensions-basic.md` §13, §14, §17 — le device 9 employé depuis une extension du BASIC, la réservation de zone par `CALL &FFFD8`, et les matrices.
 - `06-ecosysteme-outils.md` — `PLINKC162` est un exemple concret de driver IOCS tiers (lecteur `L:`) installé selon ce mécanisme.
 - `SC62015Disassembler/Data/FCSFunctions.json` — sous-ensemble machine-readable utilisé par le désassembleur pour annoter les appels `CALLF FFFE4H`/`FFFE8H` dans les listings.

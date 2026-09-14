@@ -4,7 +4,17 @@
 
 ## 1. Vue d'ensemble
 
-Rappel (détaillé dans `01-architecture-cpu-sc62015.md`) : 256 octets de mémoire **interne** (`(adresse)`) intégrés au CPU, et jusqu'à 1 Mo de mémoire **externe** (`[adresse]`, 20 bits) répartie entre ROM système (256 Ko), RAM interne utilisateur (32 Ko de base, extensible) et cartes mémoire optionnelles (slots S1/S2/S3, jusqu'à 256 Ko chacune sur PC-E500S).
+Rappel (détaillé dans `01-architecture-cpu-sc62015.md`) : 256 octets de mémoire **interne** (`(adresse)`) intégrés au CPU, et 1 Mo de mémoire **externe** (`[adresse]`, 20 bits). Trois zones de cette mémoire externe portent un nom de lecteur mémoire — **et une seule est une carte** :
+
+| Lecteur | Adresse de tête | Nature | Disque RAM qu'elle héberge |
+|---|---|---|---|
+| `S1:` | `80000H` | **RAM interne soudée** — 256 Ko sur PC-E500S, 32 Ko calés en haut (`B8000H`) sur PC-E500 | `E:` |
+| `S2:` | `40000H` | **l'unique emplacement de carte amovible** | `F:` |
+| `S3:` | `C0000H` | ROM système, qui porte les programmes préinstallés du menu | `G:` |
+
+⛔ **`S1:`, `S2:`, `S3:` ne sont pas trois slots de carte** (voir `08-cartes-memoire.md` §1bis). Et **`E:`, `F:`, `G:` ne sont pas des synonymes de `S1:`, `S2:`, `S3:`** : ce sont les disques RAM du driver MEMORY FILE (device 5, §7), chacun logé **dans** la mémoire correspondante. `E:` est toujours dans la mémoire interne, `F:` toujours dans la carte — `MEM$` ne les échange jamais (§5).
+
+*Sources : les adresses de tête sont lues dans la System Data Area d'un PC-E500S réel, et la ROM les consulte par numéro de lecteur (§4) ; l'appartenance de `E:` et `F:` est donnée par le manuel utilisateur, en anglais et en allemand, qui concordent (§5) ; `G:` pour les programmes de la ROM par le manuel allemand (PDF p. 123).*
 
 ## 1bis. Carte mémoire externe par ligne `CE` (répartition physique du 1 Mo)
 
@@ -15,9 +25,9 @@ Répartition des 8 lignes de sélection `CE0`-`CE7` (rappelées en `08-cartes-me
 | `CE6` | `10000H`-`1FFFFH` | Négative | Carte graphique (logique d'extension). |
 | `CE3` | `20000H`-`3FFFFH` | Négative | Non identifié précisément (« comme DELTA » selon la source). |
 | `CE1` | `40000H`-`7FFFFH` | Positive | **Carte mémoire d'extension, slot `S2:`** — sous-découpée selon la capacité de la carte (64 Ko/32 Ko/16 Ko/8 Ko occupent des sous-plages différentes à partir de `40000H`). |
-| `CE0` | `80000H`-`BFFFFH` | Négative | **RAM interne intégrée, `S1:`/lecteur `E:`** — fenêtre de 256 Ko (`80000H`-`BFFFFH`), dont seule la partie haute est peuplée sur les machines à faible capacité (ex. PC-E500 32 Ko : `B8000H`-`BFFFFH` ; PC-E550 64 Ko : `B0000H`-`BFFFFH`). Voir §1ter et `09-cartes-meres-ram-interne.md`. |
+| `CE0` | `80000H`-`BFFFFH` | Négative | **RAM interne intégrée, `S1:`** (qui héberge le disque RAM `E:`, §1) — fenêtre de 256 Ko (`80000H`-`BFFFFH`), dont seule la partie haute est peuplée sur les machines à faible capacité (ex. PC-E500 32 Ko : `B8000H`-`BFFFFH` ; PC-E550 64 Ko : `B0000H`-`BFFFFH`). Voir §1ter et `09-cartes-meres-ram-interne.md`. |
 | `CE7` | `BC000H`-`BFFFFH` | Positive | Réservation réseau/extension (chevauche la fin de `CE0`). |
-| `CE2` | `C0000H`-`FFFFFH` | Négative | **ROM système, slot `S3:`/lecteur `G:`**. |
+| `CE2` | `C0000H`-`FFFFFH` | Négative | **ROM système, `S3:`** (programmes préinstallés, lus par `G:`). |
 | `CE4`, `CE5` | — | — | Non attribués/non identifiés dans les sources disponibles. |
 
 Adresses `00000H`-`000FFH` : accessibles par `PEEK`/`POKE` depuis BASIC mais ne correspondent **pas** à de la mémoire externe — c'est un alias vers la RAM **interne** du CPU (`(adresse)`, §2-3 ci-dessous), exposé ainsi pour rester cohérent avec l'espace d'adressage 20 bits vu depuis BASIC.
@@ -54,7 +64,7 @@ Voir `09-cartes-meres-ram-interne.md` pour l'inventaire des puces observées sur
 | `FDH` | `SCR` | System Control Register | `ISE`(7) autorise le démarrage IRQ · `BZ2-0`(6-4) contrôle broches CO/CI · `VDDC`(3) · `STS`(2) sélection timer lent (0=0,5s / 1=2s) · `MTS`(1) sélection timer rapide (0=4ms / 1=16ms) · `DISC`(0) contrôle pilote LCD. |
 | `FEH` | `LCC` | LCD Contrast Control | `LCC4-0`(7-3) niveau de contraste (0-31) · `KSD`(2) désactive le balayage clavier · `STCL`(1)/`MTCL`(0) clear timers. |
 | `FFH` | `SSR` | System Status Register | `ONK`(3) état touche ON · `RSF`(2) *reset-start flag* · `CI`(1) entrée CMT · `TEST`(0) entrée test. |
-| `EFH` | `AMC` | Address Modify Control | `AME`(7) active la jonction virtuelle CE1/CE0 · `AM5-0`(6-1) taille CE0 (000000=2 Ko … 111111=128 Ko). |
+| `EFH` | `AMC` | Address Modify Control | `AME`(7) active la jonction virtuelle CE1/CE0 · bit 6 inutilisé · `AM5-0`(**5-0**) capacité de la carte côté `CE0`, en code thermomètre : `000000`=2 Ko, `000001`=4, `000011`=8, `000111`=16, `001111`=32, `011111`=64, `111111`=128 Ko. Confirmé par la routine de dimensionnement de la ROM (`0F0E7Bh`), qui produit exactement cette suite par `shr a`. ⛔ Une version antérieure écrivait « bits 6-1 ». |
 | `ECH`/`EDH`/`EEH` | `BP`/`PX`/`PY` | Pointeurs d'adressage interne | Voir `01-architecture-cpu-sc62015.md` §3.3. |
 
 ## 3. Adresses système en mémoire interne (zone RAM générale, `00H`-`E3H`)
@@ -77,7 +87,7 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 
 | Adresse | Sigle | Description |
 |---|---|---|
-| `BFC15`–`BFCDE` | `ldAdSlot0`/… | Table des slots de cartes mémoire : `ldAdSlot2`/`cpSlot2` (S3, défaut `C0000`/`&40`×2Ko), `ldAdSlot1`/`cpSlot1` (S2, défaut `40000`/`&80`×2Ko = 256 Ko sur E500S), `ctrlCRAM`, `ldAdSlot0`/`cpSlot0` (S1, défaut `80000`/`&80`×2Ko = 256 Ko sur E500S, `&B8000` sur E500 d'origine). |
+| `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
 | `BFC27`/`BFC28` | `SCRNX`/`SCRNY` | Prochaine coordonnée d'affichage sur `STDO:`/`SCRN:`. |
 | `BFC2A` | `LINPTN` | Cadre de points affiché dans une boîte 16 points. |
 | `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). |
@@ -91,26 +101,42 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 | `BFCC6`–`BFCDB` | voir §6 | Vecteurs RAM des 8 sources d'interruption. |
 | `BFCDE` | `UWORK` | Dernière adresse du slot S1 + 1. |
 | `BFCE1` | `SWORK` | Zone de la pile système (`S`). |
-| `BFD0E` | `BASWRK` | Zone de travail BASIC (externe). Ce nom est celui du listing de E. Kako (`register.lst`, 1990), vérité terrain du corpus. ⚠️ À ne pas confondre avec `BASPTR` = `0D1H`, le pointeur en RAM interne : un `mv x,(baswrk)` serait tronqué à 8 bits par l'assembleur, sans avertissement. |
+| `BFD0E` | `BASWRK` | **Pointeur** (3 octets) vers la zone de travail BASIC : il **contient** l'adresse, il **n'est pas** la zone. La ROM le recopie en RAM interne par `mvp (0D1h),[0BFD0Eh]` en `0F98CAh`. Pour lire la zone depuis le BASIC : `W=LPEEK &BFD0E` puis `PEEK (W+n)`. Nom de E. Kako (`register.lst`, 1990). ⛔ Décrit « zone de travail » jusqu'en septembre 2026 — corrigé à la source dans `SC62015Disassembler/Data/SystemAddresses.json`, puis `pce500.inc` **régénéré** (`12-extensions-basic.md` §7). ⚠️ À ne pas confondre avec `BASPTR` = `0D1H`, sa copie en RAM interne : un `mv x,(baswrk)` serait tronqué à 8 bits par l'assembleur, sans avertissement. |
 | `BFD17` | `IOCSWRK` | Zone de travail IOCS (externe). |
 | `BFD1A` | `USRWRK` | **Zone langage machine** — début de la zone utilisateur pour les programmes en code machine (`CALL &BFD1A` typique après `LOADM`/assemblage). ⚠️ Elle ne fait que **23 octets** : les paramètres SIO commencent en `BFD31H`. Un programme plus long assemblé là écrase la configuration de la liaison série, et la panne se manifeste au transfert *suivant*. Au-delà, charger en `BF000H`. |
 | `BFD31`–`BFD62` | — | Paramètres SIO (temporisation, vitesse, parité, fin de ligne `&1A`, délais d'ouverture/fermeture). |
 | `BFD42`–`BFD53` | — | Constantes de codage cassette (`CAS:`) : longueurs et seuils des niveaux logiques 0/1, blocs d'en-tête. |
-| `DF820`–`DF8A9` | — | Chaîne des en-têtes de drivers IOCS (voir §7). |
+| `BFE00`–`BFE04` | — | **Zone d'échange** des portes `CALL &FFFDC` et `CALL &FFFD8` (§8) : `[BFE00]` = `(cl)`, `[BFE01]` = `(ch)`, `[BFE02]` = `IL`, puis `[BFE03]` et `[BFE04]` pour deux paramètres (lettre A–Z des matrices, numéros de séquence des statistiques — `04-fcs-iocs.md` §2.5). ⚠️ **C'est un brouillon, pas une variable** : `RENUM` et `DELETE` s'en servent aussi comme octet de drapeaux (`SC62015Disassembler/Docs/Synthese/BASIC-en-ROM.md`). |
+| `BFFD0` / `BFFD8`–`BFFF7` | — | Sauvegardes des familles matrices et statistiques du device 9 : `BP` de l'appelant en `BFFD0`, RAM interne `0A0h`–`0BFh` en `BFFD8` (`04-fcs-iocs.md` §2.5). |
+| `DF820`–`DF8A9` | — | Chaîne des en-têtes de drivers IOCS **de la ROM** (voir §7). |
 
 *(Toutes les adresses ci-dessus proviennent de `PCE500 Description mémoire.xls.xlsx`, elles-mêmes vérifiées sur listings XASM réels ; les valeurs marquées « défaut » correspondent aux réglages ROM standard et peuvent différer selon la variante S1/E500/E500S.)*
 
-## 5. Cartes mémoire — modes S1 / S2 / B
+## 5. Cartes mémoire — `MEM$`, et les disques RAM `E:` / `F:`
 
-D'après le manuel PC-E500S et confirmé par la documentation d'Arno Welzel (Allemagne, cf. `07-sources-et-bibliographie.md`) : la commande BASIC `MEM$` lit/positionne le mode d'utilisation de la carte insérée dans le logement au dos de l'appareil :
+⛔ **Deux notions indépendantes, qu'une version antérieure de ce tableau juxtaposait au point de se lire à l'envers** — la ligne « `S1` » y citait `F:`, la ligne « `S2` » citait `E:`, ce qui se lisait « S1 = F, S2 = E ». La correspondance réelle est l'inverse de cette lecture, et elle **ne dépend pas du mode** :
 
-| Mode | Effet |
-|---|---|
-| `S1` | Mémoire interne = programmes ; la carte RAM est accessible en lecteur `F:`. |
-| `S2` | La carte RAM contient les programmes ; la mémoire interne devient accessible en lecteur `E:`. |
-| `B` | La carte RAM étend la mémoire interne (pas de lecteur séparé). |
+- **`E:` est TOUJOURS le disque RAM de la mémoire interne** (`S1:`) ;
+- **`F:` est TOUJOURS le disque RAM de la carte** (`S2:`).
 
-Formatage d'une carte en lecteur : `MEM$="S1"` puis `INIT "F:31K"` (taille selon capacité de la carte). Chaque carte RAM embarque sa propre pile de sauvegarde (maintien ~1 an hors alimentation). Des cartes **FRAM** modernes (ferroélectriques, jusqu'à 256 Ko, non volatiles sans pile) sont utilisables en remplacement — voir `07-sources-et-bibliographie.md`.
+`MEM$` choisit **où vivent les programmes et les variables** ; il ne déplace aucun disque RAM, il dit seulement lequel reste utilisable.
+
+| `MEM$` | Programmes et variables | `E:` (mémoire interne) | `F:` (carte) |
+|---|---|---|---|
+| `"S1"` | mémoire interne seule, la carte n'est pas utilisée pour eux | utilisable | **utilisable** — « *RAM disk F within the RAM card remains available* » |
+| `"S2"` | carte seule — variables fixes comprises ; formules (`AER`) et touches de fonction restent en mémoire interne | **utilisable** — « *RAM disk E and AER memory area within the computer memory remain available* » | non cité par le manuel : la carte porte les programmes |
+| `"B"` | mémoire interne **et** carte fusionnées | utilisable | **indisponible** — « *RAM disk F becomes unavailable, while RAM disk E remains available* » |
+
+*Source : manuel utilisateur, pp. 20-23 du livre — en anglais (`SC62015Disassembler/Docs/Doc technique/PC-E500 manual_EN.pdf`, PDF pp. 28-31) et en allemand (`PC-E500S-DE.pdf`, PDF pp. 29-31), qui disent la même chose mot pour mot. La page `MEM$` du manuel anglais (livre p. 295) : « "S1" means that the external RAM card is not being used. "S2" means that only the external RAM card is being used. "B" means that the RAM card is being used as an extension of the internal memory space. »*
+
+Ce que le manuel ajoute, et qui compte en pratique :
+
+- **Pour un disque RAM plus grand, Sharp recommande `F:` avec `MEM$="S1"`** plutôt que `E:` avec `MEM$="B"` : une carte ainsi formatée passe d'un PC-E500 à l'autre, et plusieurs cartes s'emploient comme des disquettes.
+- **Une carte en `"S2"`** ne passe sur une autre machine que si celle-ci n'emploie ni `E:` ni l'`AER`.
+- **Une carte en `"B"`** ne fonctionne qu'avec la mémoire interne qui l'accompagne, et doit être vidée avant le passage en `"B"`.
+- **Les bascules permises** : `"S1"` ↔ `"S2"` et `"S1"` ↔ `"B"` — jamais `"S2"` ↔ `"B"` directement.
+
+Formatage d'une carte en disque RAM : `MEM$="S1"` puis `INIT "F:31K"` (taille selon capacité de la carte). Chaque carte RAM embarque sa propre pile de sauvegarde (maintien ~1 an hors alimentation). Des cartes **FRAM** modernes (ferroélectriques, jusqu'à 256 Ko, non volatiles sans pile) sont utilisables en remplacement — voir `07-sources-et-bibliographie.md`.
 
 ## 6. Interruptions — vecteurs RAM par défaut
 
@@ -131,32 +157,39 @@ Un programme peut réécrire une de ces adresses pour intercepter l'interruption
 
 ## 7. Chaîne des en-têtes de drivers IOCS
 
-À partir de `DF820H` (`IOCSH`, §4), une chaîne d'en-têtes décrit chaque driver installé (nom de lecteur(s), point d'entrée). Table des drivers standard :
+`IOCSH` (`BFCA2`, §4) désigne la tête de la chaîne ; celle de la ROM commence en `DF820H`. Chaque en-tête vaut `suivant 3 o / device 1 o / attributs 1 o / entrée 3 o / nom(s) ASCII`, et la chaîne s'arrête sur `suivant = FFFFFH`. Relevé **octet à octet dans `rom83.bin`** (PC-E500S 8.3) :
 
-| En-tête | Lecteur(s) | Point d'entrée |
-|---|---|---|
-| `DF820` | `STDI:` `KYBD:` (clavier) | `F16F2` |
-| `DF833` | `STDO:` `SCRN:` (écran) | `F21E7` |
-| `DF846` | `COM:` (liaison série) | `EAA71` |
-| `DF853` | `STDL:` `PRN:` (imprimante) | `EA4BD` |
-| `DF865` | `CAS:` (cassette) | `E96E8` |
-| `DF872` | `S1:` `S2:` `S3:` (carte mémoire) | `E493E` |
-| `DF884` | `E:` `F:` `G:` (fichier mémoire) | `E493E` |
-| `DF893` | `X:` `Y:` (lecteur de disquette) | `EF029` |
-| `DF89C` | `SYSTM:` | `B66C0` |
-| `DF8A9` | fonction système | `FFFFF` (fin de chaîne) |
+| En-tête | Device | Driver | Lecteur(s) | Entrée | Suivant |
+|---|---|---|---|---|---|
+| `DF820` | 0 | DISPLAY | `STDO:` `SCRN:` | `F21E7` | `DF833` |
+| `DF833` | 1 | KEY | `STDI:` `KYBD:` | `F16F2` | `DF846` |
+| `DF846` | 2 | SIO | `COM:` | `EAA71` | `DF853` |
+| `DF853` | 3 | PRINTER | `STDL:` `PRN:` | `EA4BD` | `DF865` |
+| `DF865` | 4 | TAPE | `CAS:` | `E96E8` | `DF872` |
+| `DF872` | 6 | MEMORY CARD | `S1:` `S2:` `S3:` | `F0000` | `DF884` |
+| `DF884` | 5 | MEMORY FILE | `E:` `F:` `G:` | `E493E` | `DF893` |
+| `DF893` | 9 | FUNCTION | *(aucun)* | `EF029` | `DF89C` |
+| `DF89C` | 7 | FDD | `X:` `Y:` | `EB66C` | `DF8A9` |
+| `DF8A9` | 8 | SYSTEM | `SYSTM:` | `E0183` | `FFFFF` |
+
+⛔ **La version antérieure de ce tableau était fausse sur sept lignes sur dix** : les deux premiers en-têtes intervertis (clavier et écran), `S1:`/`S2:`/`S3:` et `E:`/`F:`/`G:` rendus au même point d'entrée, `X:`/`Y:` placés sur l'en-tête du Function Driver, `SYSTM:` décalé d'un cran avec une entrée inventée (`B66C0`), et le device 8 donné comme « fonction système » en fin de chaîne. Le relevé ci-dessus est celui de `SC62015Disassembler/Docs/Synthese/Memoire-et-SDA.md` et `Drivers-IOCS.md`, où il **fait autorité**.
+
+> ⚠️ **Les en-têtes ne sont pas rangés par numéro de device** : 6 précède 5, et 9 précède 7 puis 8. C'est le numéro de **device** — et non la position dans la chaîne — qui choisit le jeu de commandes `41H`-`7FH`.
+>
+> ⚠️ **La colonne « Entrée » vaut pour `rom83` et pour elle seule.** La ROM du PC-E500 (`rom53`) porte les mêmes en-têtes dans le même ordre, mais **sept entrées sur dix** y sont à d'autres adresses : une entrée de driver se lit dans la chaîne de la machine, jamais dans un relevé.
 
 Ce format d'en-tête chaîné (adresse du suivant sur 3 octets + identifiant + attributs + adresse d'entrée 3 octets + nom ASCII) permet d'installer un nouveau driver résident sans modifier la ROM : c'est le mécanisme qu'utilise `PLINKC162` (lecteur `L:`, voir `06-ecosysteme-outils.md`) et que documente `Data/SystemDataRegions.csv` sous la clé `iocs_hdr_tbl` (`DF820`, 152 octets, jusqu'à sentinelle `FFFFF`).
 
-## 8. Zone haute fixe (`FFFF0H`–`FFFFFH`)
+## 8. Zone haute fixe (`FFFD8H`–`FFFFFH`)
 
 | Adresse | Contenu |
 |---|---|
+| `FFFD8H` | `secure_work_call` — **réservation d'une zone** depuis le BASIC : `POKE &BFE03,` adresse (3 o) `,` valeur (3 o) puis `CALL &FFFD8`. La ROM (`0F964Fh`) relit ces six octets et appelle **IOCS `042h` `secure_work`** du device 8. Usage détaillé, et la réservation de la zone langage machine : `12-extensions-basic.md` §14. |
+| `FFFDCH` | `iocs_call3` — appel IOCS **depuis le BASIC**, sans code machine : `POKE &BFE00,cl,ch,il` puis `CALL &FFFDC`. La ROM (`0EF01Ah`) fait `mv il,[0BFE02h]` / `mvw (cl),[0BFE00h]` / `callf iocs_call`. Exemple du manuel : `POKE &BFE00,8,0,&41 : CALL &FFFDC` éteint la machine. |
 | `FFFE4H` | Point d'entrée **FCS** (`callf fcs_call`) — voir `04-fcs-iocs.md`. |
 | `FFFE8H` | Point d'entrée **IOCS** (`callf iocs_call`), entrée principale du BIOS. |
-| `FFFDCH` | Appel IOCS alternatif par registres (`il`,`cl`,`ch`) : `POKE &BFE00,cl,ch,il` puis `CALL &FFFDC`. |
-| `FFFF0H` | Version majeure ROM (`8` = PC-E500S, `7` = PC-E500). |
-| `FFFF1H` | Version mineure ROM (`3` pour les deux modèles). |
+| `FFFF0H` | Version majeure ROM (`8` = famille PC-E500S, dont le PC-U6000 ; `7` = PC-E500 et PC-E550 ; `5` = série ancienne de PC-E500). |
+| `FFFF1H` | Version mineure ROM — **elle varie** : `8.3` PC-E500S, `8.4` PC-U6000, `7.2` PC-E500 japonais, `7.3` PC-E500, `7.5` PC-E500-BL et PC-E550, `5.3` série ancienne (`SC62015Disassembler/Data/RomVersions.csv`). ⛔ Une version antérieure écrivait « `3` pour les deux modèles ». |
 | `FFFF2H`–`FFFF9H` | Réservé / non documenté. |
 | `FFFFAH`–`FFFFCH` | **Vecteur d'interruption matériel** (3 octets, pointeur). |
 | `FFFFDH`–`FFFFFH` | **Vecteur RESET** (3 octets) — saute vers le lancement du menu BASIC. |
