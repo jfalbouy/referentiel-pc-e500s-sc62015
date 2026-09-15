@@ -1,10 +1,24 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
+> **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
+> [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
+> projet transverse et son document de référence : les 168 instructions standard (lues dans
+> l'image), la procédure, les adresses de la ROM, la restitution à l'interpréteur, les gabarits.
+> Ce chapitre reste le **journal raisonné des mesures** ; en cas de désaccord, **c'est
+> `MODE-EMPLOI.md` qui fait foi**. Trois points y ont été établis ou corrigés depuis :
+>
+> - ✅ le retour d'une **chaîne** est établi : douze mots-clés, dont huit fonctions chaîne, validés
+>   le 2026-09-15 ;
+> - ⛔ une fonction qui lit une chaîne par `eval` la rend **sans `pmdf`**. La règle est le bilan :
+>   `BP` d'entrée − 15 (`MODE-EMPLOI.md` §6.1) ;
+> - ⛔ les tokens libres sont **86**, et non 88 : `38h` et `A6h` ont une routine sans avoir de nom
+>   (§2.3).
+
 L'interpréteur BASIC du PC-E500S expose **deux crochets** par lesquels un programme en langage machine installe ses propres mots-clés. Une fois installés, ils s'emploient exactement comme ceux de la ROM : `PRINT LPEEK &BF100` et non `CALL &BF000`.
 
 Le mécanisme est **spécifié** (§7), mais aucun des projets de `C:\Claude` ne l'exploitait avant septembre 2026, et le seul exemple du corpus — `BASCOM` (TORO, 1994) — n'ajoute que des **instructions**. Les **fonctions** ont demandé une rétro-ingénierie complète, validée sur machine ; c'est l'objet principal de ce document.
 
-> **Où est le code.** Les gabarits assemblables sont dans `SC62015Disassembler/Samples/LPEEK/` — `LSEPT.ASM` (instruction) et `LPEEK.ASM` (deux fonctions, `LPEEK` et `WPEEK`), avec `TEST.BAS` qui les exerce depuis un programme. Le détail commenté ligne à ligne est dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`. Ce document en donne le principe, pas la copie.
+> **Où est le code.** Dans `C:\Claude\BASEXT\src\` : `BASEXT.ASM` (les douze mots-clés), `LSEPT.ASM` (l'ancêtre, la seule fonction `LPEEK`), `STREXT.ASM` (mise au point des fonctions chaîne), et les programmes d'essai dans `essais\`. ⛔ Ce paragraphe citait `SC62015Disassembler/Samples/LPEEK/`, dossier absent du disque (vérifié le 2026-09-15). Le détail commenté ligne à ligne est dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`. Ce document en donne le principe, pas la copie.
 
 ---
 
@@ -57,7 +71,7 @@ Trois contraintes, dont la troisième est un apport de mesure :
 2. **Le token `000H` est exclu** : il termine la liste des adresses.
 3. ⛔ **Un mot-clé ajouté ne doit ni commencer par un mot-clé existant, ni être le début de l'un d'eux.** Le tokeniseur consulte la table de la ROM, et `PEEKX` y est coupé en `PEEK` + la variable `X` — la ligne relue s'affiche littéralement `PRINT HEX$ PEEK X &BF100`. Vérifiable avant d'écrire une ligne de code, sur les 168 noms de `SC62015Disassembler/Data/BasicTokens.csv`.
 
-**88 des 256 tokens sont libres** dans la table de la ROM. `BASCOM` occupe `04H`-`06H`.
+**86 des 256 tokens sont libres** dans la table de la ROM. `BASCOM` occupe `04H`-`06H`. ⛔ Écrit « 88 » jusqu'au 2026-09-15, soit 256 − 168 : la table de répartition donne une routine à `38H` et `A6H`, qui n'ont pas de nom. Liste : `C:\Claude\BASEXT\MODE-EMPLOI.md` §2.3.
 
 > Un mot-clé d'extension est tokenisé **`0FEH` + token**, sur deux octets. Le préfixe `0FEH` n'est pas propre aux extensions : il précède *tous* les tokens dans un programme BASIC (*« Im Basicprogramm haben die Token noch den Vorcode FE »*, manuel système allemand).
 
@@ -723,9 +737,9 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 
 6. **Trois arguments ou plus.** `MOD` en prend deux, sur le modèle de `POINT`. `MID$` en prend
    trois : lire son lecteur d'arguments donnerait le gabarit.
-7. **Retourner une CHAÎNE.** Déjà noté comme ouvert. Les services de chaîne du device 9 allouent
-   sur la pile `U` et consomment leur argument : le contrat de `U` (§4) change, et il faudra
-   l'établir avant d'écrire une ligne.
+7. ✅ **~~Retourner une CHAÎNE~~** — établi sur machine les 2026-09-14 et 15 : huit fonctions
+   chaîne de BASEXT (`UCASE$`, `LCASE$`, `TRIM$`, `LTRIM$`, `RTRIM$`, `REPT$`, `SREPT$`, `INSTR`).
+   Lecture, rendu et contrat de `U` : `C:\Claude\BASEXT\MODE-EMPLOI.md` §5.4 et §6.3.
 8. **Accepter les deux types.** `eval` rend le bit 7 de `(bp+0)` armé pour une chaîne. Une
    extension pourrait s'en servir pour offrir deux comportements sous un même nom, comme la ROM
    le fait pour ses six tokens doubles.
@@ -736,7 +750,7 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 
 ### Sur l'outillage
 
-10. **Les 88 tokens libres.** La table de la ROM en laisse 88 inoccupés, mais rien ne garantit
+10. **Les 86 tokens libres** (et non 88, voir §2). La table de la ROM 8.3 en laisse 86 inoccupés, mais rien ne garantit
     qu'une révision de ROM n'en emploie aucun. Vérifiable en confrontant les tables lues dans
     `rom83`, `rom75` et `rom53`.
 11. ✅ **~~La position du second opérande, et le sens de `div`~~** — **mesurés le 2026-09-06**
@@ -769,7 +783,7 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 >
 > ✅ **La règle qui en découle, et elle vaut pour toute extension : qui appelle `div` doit
 > tester son diviseur LUI-MÊME, avant l'appel.** C'est ce que fait déjà le `MOD` entier de
-> `Samples/BASEXT`, qui rend l'erreur 21 sur `B = 0` sans jamais laisser la ROM s'en charger —
+> `C:\Claude\BASEXT`, qui rend l'erreur 21 sur `B = 0` sans jamais laisser la ROM s'en charger —
 > choix qui se trouve validé après coup.
 >
 > ⚠️ Cette lecture explique les trois affichages mais reste une **inférence** : `BP` n'a pas
@@ -895,7 +909,7 @@ fonction est appelée **pendant** l'évaluation d'une expression, une instructio
 - **Mesures sur PC-E500S et PockEmul**, septembre 2026 — la contrainte de nommage, la limite des 20 bits, le contrat de `X`, et la validation de `LPEEK` et `WPEEK`.
 - **`SC62015Disassembler/Samples/DEVICE9/`** — les sondes du Function Driver : `SQR`, `ADDTEST`, `DIVTEST` (famille 0, §13) et `MATTEST` (famille 1, §17). Chaque source consigne en en-tête le résultat observé et sa lecture.
 - **Manuels Sharp, pour les matrices** — technique, livre pp. 79-82 (PDF pp. 83-86) : les tables des trois familles ; utilisateur allemand `PC-E500S-DE.pdf`, livre pp. 138-148 (PDF pp. 146-156) : le mode MATRIX, le rangement dans les tableaux BASIC, la mémoire et les erreurs.
-- **`SC62015Disassembler/Samples/BASEXT/`** — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`), 530 octets, validés sur machine le 2026-09-05. Son `README.md` porte le journal des cinq défauts successifs de `MOD` et de ce que chacun a coûté.
+- **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
 
 ---
 
@@ -917,8 +931,9 @@ plusieurs arguments (§9, qui était le premier point resté ouvert), le compte 
 **Le 2026-09-14** : la famille **matrices** du device 9 (§17) — contrat lu sur le code et les deux
 manuels, transposée et déterminant mesurés par `MATTEST`, puis chantier suspendu à la demande.
 
-**Reste ouvert** : le retour d'une **chaîne** plutôt que d'un nombre, et les quinze autres pistes
-du §16, dont quatre sur les matrices et les statistiques (14 à 17).
+**Reste ouvert** : les pistes du §16, dont quatre sur les matrices et les statistiques (14 à 17).
+✅ Le retour d'une **chaîne**, longtemps ouvert, est établi depuis le 2026-09-15 : voir
+`C:\Claude\BASEXT\MODE-EMPLOI.md`, désormais le référent.
 
 ⛔ **Une correction du 2026-09-06, et c'est la plus instructive.** La première rédaction du
 §13 concluait à une « impasse du device 9 ». Elle était fausse : `Samples/DEVICE9/SQR.ASM`

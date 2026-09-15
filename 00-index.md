@@ -16,7 +16,7 @@ Référentiel technique en français sur le Sharp PC-E500S et son CPU **SC62015 
 10. [**Fabrication carte FRAM 1024 Ko**](./10-fabrication-carte-1024ko-fram.md) — nomenclature chiffrée (composants, fournisseurs, coût total estimé), schéma fonctionnel proposé (décodeur, registre de banque, sélection des puces) et proposition de PCB (format, empilage, placement), avec hypothèses de conception clairement signalées.
 11. [**Fabrication carte FRAM 256 Ko**](./11-fabrication-carte-256ko-fram.md) — même exercice pour une carte 256 Ko (sans registre de banque, plus simple et moins chère), avec prix de référence du produit commercial japonais équivalent (`tmfg.jp`, ~80 €) et découverte annexe d'un service commercial de transformation RAM interne 32K→256K.
 
-12. [**Étendre le BASIC**](./12-extensions-basic.md) — ajouter ses propres instructions et fonctions à l'interpréteur : les deux crochets de la zone de travail, le format des deux tables, le drapeau instruction/fonction, le contrat d'une routine (`X`, `I`, `BP`, `U`, retenue), le gabarit d'une fonction numérique, et **le passage de plusieurs arguments**. Les deux évaluateurs — un terme ou une expression complète —, le compte des cadres **mesuré**, `SHL` contre `ROL`, l'idempotence de l'installation, et les pièges d'usage qui coûtent plus cher que le code : tokenisation à la saisie, réservation de la zone langage machine, `CRLF` et majuscules. Puis **les matrices du device 9** : ce sont des tableaux BASIC, le contrat d'appel, et la première mesure. Se termine par **dix-sept pistes à vérifier**, dont une close.
+12. [**Étendre le BASIC**](./12-extensions-basic.md) — ➡️ **référent depuis le 2026-09-15 : le projet transverse `C:\Claude\BASEXT` et son [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md)** (les 168 instructions standard lues dans l'image, la procédure, les adresses de la ROM, la restitution à l'interpréteur). Ce chapitre en garde le journal raisonné des mesures : ajouter ses propres instructions et fonctions à l'interpréteur : les deux crochets de la zone de travail, le format des deux tables, le drapeau instruction/fonction, le contrat d'une routine (`X`, `I`, `BP`, `U`, retenue), le gabarit d'une fonction numérique, et **le passage de plusieurs arguments**. Les deux évaluateurs — un terme ou une expression complète —, le compte des cadres **mesuré**, `SHL` contre `ROL`, l'idempotence de l'installation, et les pièges d'usage qui coûtent plus cher que le code : tokenisation à la saisie, réservation de la zone langage machine, `CRLF` et majuscules. Puis **les matrices du device 9** : ce sont des tableaux BASIC, le contrat d'appel, et la première mesure. Se termine par **dix-sept pistes à vérifier**, dont une close.
 
 ## Comment utiliser ce référentiel
 
@@ -24,7 +24,7 @@ Référentiel technique en français sur le Sharp PC-E500S et son CPU **SC62015 
 - Pour comprendre ou étendre les annotations du désassembleur (appels système, adresses connues) : `03` et `04`.
 - Pour situer un projet existant dans l'ensemble ou décider où ajouter un nouvel outil : `06`.
 - Pour vérifier ou sourcer une affirmation : `07`.
-- Pour ajouter une instruction ou une fonction au BASIC : `12`, après `03` (la zone de travail) et `05` (la syntaxe XASM).
+- Pour ajouter une instruction ou une fonction au BASIC : **`C:\Claude\BASEXT\MODE-EMPLOI.md`**, le référent ; `12` pour l'histoire des mesures, `03` (la zone de travail) et `05` (la syntaxe XASM).
 
 ## Principe de non-duplication
 

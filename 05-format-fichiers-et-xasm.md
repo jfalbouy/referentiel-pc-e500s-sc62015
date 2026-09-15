@@ -126,7 +126,7 @@ C'est un **filtre de listing pur** : l'objet et toutes les autres sorties sont i
 xasm2026-4 NOM.ASM -ONOM.OBJ -L -S -B -K
 ```
 
-C'est celle des sondes de `SC62015Disassembler/Samples/DEVICE9/` et du module `Samples/BASEXT/`.
+C'est celle des sondes de `SC62015Disassembler/Samples/DEVICE9/` et du module BASEXT (`C:\Claude\BASEXT\src\`, anciennement `Samples/BASEXT/`).
 
 > ⚠️ **Le nom de fichier VOYAGE DANS l'enveloppe uuencode — et deux noms distincts sont en jeu.**
 >
