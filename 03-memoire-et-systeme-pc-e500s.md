@@ -74,7 +74,7 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 | Addr | Sigle | Description |
 |---|---|---|
 | `CBH` | `TXTBAS` | Adresse (3 octets) où réside `TEXT.BAS` courant. |
-| `CEH` | `DATBAS` | Adresse où réside `DATA.BAS` courant. |
+| `CEH` | `DATBAS` | Adresse où réside `DATA.BAS` courant. ⚠️ Ces deux blocs **bougent** quand un pilote s'insère avant eux : l'installateur doit recaler `TXTBAS`/`DATBAS` (§7bis). |
 | `D1H` | `BASPTR` | **Pointeur** (3 octets) vers la zone de travail de l'interpréteur BASIC. Nommé `BASWRK` jusqu'en septembre 2026 — même nom que la zone externe `BFD0EH`, ce qui rendait l'adresse interne innommable dans une source et a coûté une dizaine d'essais : voir `12-extensions-basic.md` §7. Porte les crochets d'extension du BASIC en `[(0D1H)+090H]` et `[(0D1H)+093H]`. |
 | `D4H`/`D5H` | `BL`/`BH` | Registre `B` étendu (paire haute/basse, usage interne interpréteur). |
 | `D6H`/`D7H` | `CL`/`CH` | Registre `C` étendu. |
@@ -94,8 +94,8 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 | `BFC6D` | `FHANDLE` | Table des handles de fichiers ouverts. |
 | `BFC7D` | `DEFDRV` | Nom du lecteur par défaut (7 octets, ex. `F:____0`). |
 | `BFC84`–`BFC96` | — | Adresses (3 octets chacune) des polices de caractères par plage de codes (0-1F, 20-7F, 80-9F, A0-DF, E0-FF) + `DOTSOP` (mode d'affichage précédent). |
-| `BFC9B`–`BFCA1` | `CSRX`/`CSRY`/`WIDTH`/`HEIGHT`/`LCDMOD` | Curseur LCD, largeur (`&28`=40 col.), hauteur (4 lignes), mode vidéo (normal/inversé). |
-| `BFCA2` | `IOCSH` | Adresse du prochain en-tête de chaîne IOCS (voir §7). |
+| `BFC9B`–`BFCA1` | `CSRX`/`CSRY`/`WIDTH`/`HEIGHT`/`LCDMOD` | Curseur LCD, largeur (`&28`=40 col.), hauteur (4 lignes), mode vidéo (normal/inversé). ✅ **`HEIGHT` = `BFC9E` (`lcd_height` dans `pce500.inc`) borne la console** : le pilote d'écran défile quand la ligne l'atteint (`0F2B6Ah`), `clear_disp` n'efface que les lignes `0`..`HEIGHT−1`, et `LOCATE` refuse un `Y` au-delà. Mesuré sur machine (J.-F. Albouy, septembre 2026) : `POKE &BFC9E,2` confine affichage, défilement **et** `CLS` aux lignes 0-1, et `CLS` **ne remet pas** la hauteur à 4. ⚠️ L'état **survit à la fin du programme** (l'invite du mode direct reste dans la fenêtre) : finir par `POKE &BFC9E,4:CLS`, dans cet ordre ; après une erreur ou un BREAK, MENU puis BASIC. ⚠️ `CLS` avec une hauteur ≠ 4 affiche les **libellés des touches de fonction** sur la ligne 3 (`0F931Ah` → `fkey_display` `0F1CFAh`) : ce n'est pas un plantage. La ROM ne connaît **aucune ligne de début** : son défilement part toujours de la ligne 0 (`0F27F1h`) — pour figer le haut de l'écran, voir `XCONSOLE` (`12-extensions-basic.md` §17bis). |
+| `BFCA2` | `IOCSH` | Adresse du prochain en-tête de chaîne IOCS (voir §7) — `d_link` dans `pce500.inc`. 📖 La ROM la remet à `DF820H` en `0F0D9Eh` (séquence d'amorçage) et en `0F1665h` (initialisation complète). ✅ Un pilote chaîné en tête y **reste** après `OFF`/`ON`, un petit reset `CALL &FFFD8` et un soft RESET (bouton seul, sans initialisation) : mesuré avec `BASEXT-DRV` le 2026-09-16 (§7bis). |
 | `BFCBA`–`BFCBF` | — | Paramètres clavier : délai avant répétition, cadence de répétition, délai d'extinction automatique (`&B0`×0,5s), drapeaux *break*/pile faible, répétition/clic activés. |
 | `BFCC0`/`BFCC3` | — | Table principale de conversion code matériel → code logiciel clavier, *hook* de traitement. |
 | `BFCC6`–`BFCDB` | voir §6 | Vecteurs RAM des 8 sources d'interruption. |
@@ -180,6 +180,33 @@ Un programme peut réécrire une de ces adresses pour intercepter l'interruption
 
 Ce format d'en-tête chaîné (adresse du suivant sur 3 octets + identifiant + attributs + adresse d'entrée 3 octets + nom ASCII) permet d'installer un nouveau driver résident sans modifier la ROM : c'est le mécanisme qu'utilise `PLINKC162` (lecteur `L:`, voir `06-ecosysteme-outils.md`) et que documente `Data/SystemDataRegions.csv` sous la clé `iocs_hdr_tbl` (`DF820`, 152 octets, jusqu'à sentinelle `FFFFF`).
 
+## 7bis. La chaîne des blocs de `S1:` — où loger un pilote résident
+
+Un pilote résident vit dans un **bloc** de `S1:` (en-tête `0FBh` + nom 8.3 ; attribut relevé `25h` pour `BASEXT.SYS`, `20h` pour les blocs du BASIC — un pilote se reconnaît aux bits `0Ch`, test de PLINKC), protégé comme un fichier, et publie son en-tête IOCS dans la chaîne du §7. **Où** l'insérer dans la chaîne des blocs n'est pas un détail : c'est ce qui décide s'il bougera. Mesuré sur émulateur PC-E500S par J.-F. Albouy le 2026-09-16 (`C:\Claude\BASEXT-DRV\essais\BLOCS.BAS`, `PEEK` seulement ; `CONCEPTION.md` §5bis et §5ter).
+
+✅ **Après un RESET complet, sans pilote** :
+
+| Bloc | Adresse | Taille du bloc (`+11h`) | `FILES` |
+|---|---|---|---|
+| `DATA    BAS` | **`080018h`**, le premier | **251 597** | 411 |
+| `TEXT    BAS` | `0BD6E5h` | 650 | 616 |
+| `FUNCKEY` | `0BD96Fh` | 110 | 76 |
+| `AER` | `0BD9DDh` | 61 | 27 |
+
+La chaîne est jointive et se termine en `0BDA1Ah`, contre `[s1_btm]` − 1. Ce qui en découle :
+
+1. ✅ **`DATA.BAS` est le premier bloc et contient toute la mémoire libre.** Il n'y a pas de place « après la chaîne » : elle est **dans** `DATA.BAS`, et `TXTBAS`/`DATBAS` (§3) désignent ces deux blocs.
+2. ⛔ **Un bloc ajouté en fin de chaîne bouge.** Au premier besoin de place du BASIC, `DATA.BAS` regrossit et **pousse vers le haut** tout ce qui le suit ; le bloc est déplacé **sans relocation**, et les pointeurs extérieurs (maillon IOCS, crochets du BASIC) désignent l'ancienne adresse. Mesuré : bloc copié en `0804E5h`, relu en `0BCF30h` au `RUN` suivant ; la ligne tapée ensuite a arrêté PockEmul (FACTORY RESET). C'est ce que faisait le `DRIVER_TEMPLATE` de `xasm2026-4`, validé seulement jusqu'à « apparaît dans `FILES` ».
+3. ✅ **Le modèle qui tient est celui de `PLINKC` 1.62**, validé sur matériel : compacter (IOCS device 6, `47h`), insérer **avant le premier bloc qui n'est pas un pilote** (donc avant `DATA.BAS`), décaler les blocs suivants vers le haut, puis **recaler `TXTBAS`/`DATBAS`** (`linkbas` : IOCS `41h` sur les noms rangés en `[baswrk]+72h`/`+7Eh`) — sur **tous** les chemins qui suivent le compactage, erreurs comprises. Mesuré avec `BASEXT-DRV` 0.2 : bloc en `080018h`, **immobile** après une ligne tapée, `DATA.BAS` et `TEXT.BAS` regrossissant derrière lui.
+
+Autres faits mesurés au passage :
+
+- ✅ **`FILES` affiche la taille du bloc moins `22h`** (34 octets d'en-tête) pour `TEXT`, `FUNCKEY`, `AER`, `BASEXT.SYS` et `PLINK.SYS` — mais **pas** pour `DATA.BAS`, dont le bloc est plus grand que le fichier. Hypothèse : `FILES` affiche `[+16h]` − `22h`, la taille du fichier. Non vérifié.
+- ✅ **`s1_btm` suit la réservation de la zone langage machine octet pour octet** : réserver 6144 octets l'abaisse de 6144, revenir à 16 le remonte de 6128, et `DATA.BAS` reprend la place.
+- ✅ Après `KILL` d'un bloc, **la ROM recale elle-même** `TXTBAS`/`DATBAS`.
+- 📖 Un bloc **`ENG     $$$`** peut apparaître : c'est un fichier de travail de la ROM (`"S1:ENG     .$$$"` en `0DF995h`, voisin du catalogue de formules), pas un pilote.
+- ⚠️ **Limite connue, commune avec PLINKC** : un pilote inséré **sous** un autre puis supprimé par `KILL` fait descendre celui du dessus, sans relocation. Non mesuré.
+
 ## 8. Zone haute fixe (`FFFD8H`–`FFFFFH`)
 
 | Adresse | Contenu |
@@ -198,5 +225,6 @@ Ce format d'en-tête chaîné (adresse du suivant sur 3 octets + identifiant + a
 
 - `01-architecture-cpu-sc62015.md` — registres CPU, pagination, modes d'adressage.
 - `04-fcs-iocs.md` — catalogue des fonctions FCS/IOCS accessibles via `FFFE4H`/`FFFE8H`.
-- `06-ecosysteme-outils.md` — outils du projet qui exploitent ces adresses (PLINKC162, désassembleur...).
+- `06-ecosysteme-outils.md` — outils du projet qui exploitent ces adresses (PLINKC162, `BASEXT-DRV`, désassembleur...).
+- `C:\Claude\BASEXT-DRV\CONCEPTION.md` — les mesures du §7bis, et un installateur de pilote complet (relocation, insertion, recalage du BASIC, désinstallation).
 - `07-sources-et-bibliographie.md` — provenance détaillée (manuels Sharp, xlsx interne, site d'Arno Welzel).

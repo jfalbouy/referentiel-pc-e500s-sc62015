@@ -71,6 +71,19 @@ Convention d'appel : numéro de fonction dans `I` (`IL`), paramètres additionne
 
 Table système faisant correspondre un *handle* de fichier (le `#n` de BASIC) à un numéro de FCB. Les handles `00H`-`0FH` correspondent à un numéro de FCB, `FFH` = inutilisé. Les handles `0`, `1`, `2` sont réservés et déjà ouverts au démarrage de BASIC : `0` = écran (`stdo:`), `1` = clavier (`stdi:`), `2` = imprimante/liste (`stdl:`).
 
+### ⛔ Le FCS n'écrit pas par la chaîne IOCS : il mémorise l'entrée du pilote à l'ouverture
+
+Chaque handle ouvert a un **bloc de contrôle** (`1Fh` octets), dont l'octet 0 est le device (`0FFh` = libre) et dont **`+2` porte l'adresse d'entrée du pilote, relevée à l'OUVERTURE** (`0E07F1h`). À l'écriture, le FCS **saute directement** à cette adresse (`0E0907h`), sans repasser par `iocs_call` ni par la chaîne des en-têtes.
+
+```
+bloc = [(iocsw)] + [(iocsw)+25h] + numero * 1Fh     numero = [FHANDLE + handle], borne [(iocsw)+27h]
+releve sur un PC-E500S reel (s1-1.bin) -- handle 0 en 0BEE48h :  00 00 E7 21 0F A2 ...
+                                                                 |  |  \______/
+                                                            device lecteur  0F21E7h = entree DISPLAY
+```
+
+**Conséquence** : un filtre ajouté **en tête de la chaîne** (la méthode de `MEMCHECK`, valable pour les appels IOCS) **ne voit jamais un `PRINT`**. Pour intercepter l'écran, il faut remplacer l'adresse `[bloc du handle 0 + 2]` et transmettre à l'ancienne. ✅ Éprouvé sur machine par le filtre de `XCONSOLE` (`C:\Claude\BASEXT`, septembre 2026 ; `12-extensions-basic.md` §17bis). Si la ROM rouvre `STDO:`, le filtre disparaît simplement. ⚠️ Seul le handle concerné est filtré : un `OPEN "SCRN:"` ouvre un autre handle, qui garde l'adresse de la ROM.
+
 ### Codes d'erreur FCS (`C=1`, code retourné dans `A`)
 
 | Code | Signification |
@@ -127,7 +140,7 @@ Bits d'attribut (`+4`) :
 | `08H`-`0FH` | Traitement fichier des périphériques caractère standard (utilisé depuis FCS). |
 | `10H`-`1FH` | Traitement fichier des périphériques bloc standard (utilisé depuis FCS) — lecture/écriture secteur, etc. |
 | `20H`-`3FH` | Traitement fichier des périphériques spéciaux (utilisé depuis FCS) ; `3FH` = formatage. |
-| `40H` | Initialisation, commande commune à tous les drivers. |
+| `40H` | Initialisation, commande commune à tous les drivers. 📖 La commande `05H` de la routine principale (`0E0159h`) l'envoie à **tous** les pilotes chaînés, en **ignorant la retenue** : un pilote qui répond « commande non gérée » (`sc`/`retf`) y est inoffensif. |
 | `41H`-`7FH` | Fonctions propres à chaque périphérique, **choisies par le numéro de device en `(cl)`** : `43H` vaut `key_read` sur le clavier, `printer_check` sur l'imprimante, `block_transfer` sur la carte mémoire, `basic_exec` sur le driver système ; `47H` vaut `condense` (compactage) sur la carte mémoire, device 6 (cf. `Data/FCSFunctions.json`). |
 | `80H`-`FFH` | Réservé. |
 
@@ -170,6 +183,12 @@ Illustration des fonctions « `41H`-`7FH` propres au périphérique », ici pour
 | `47H`/`48H` | Défilement de `n` lignes vers le haut/bas. |
 | `49H` | Effacement d'une ligne. |
 | `4AH` | Affichage d'un motif 8 points. |
+| `51H` | `clear_disp` — effacement de l'affichage ; ✅ n'efface en fait que les lignes `0`..`lcd_height−1` (`BFC9EH`, `03` §4 ; `0F2771h`), mesuré sur machine par `CLS`. |
+| `53H` | Absente du manuel, jamais émise par `rom83` ; un relevé antérieur disait « suppression d'une ligne », rien ne l'étaye. |
+| `55H`/`56H` | `pattern_read`/`pattern_write` — motif de points d'une ligne (`(bh)` = ordonnée) vers/depuis la mémoire externe (`X`, **240 octets**). ✅ Employées avec `49H` par le filtre de `XCONSOLE` pour défiler une partie seulement de l'écran. |
+| `58H` | `guide_line` — chaînes encadrées d'un guide ; c'est par elle que `fkey_display` (clavier, `46H`) dessine les libellés des touches de fonction. |
+
+*(Noms et descriptions de `41H`-`58H` : `SC62015Disassembler/Data/FCSFunctions.json`, qui porte toute la liste.)*
 
 Le manuel documente de la même façon chaque autre driver standard (clavier, SIO, imprimante, cassette, carte mémoire, disquette — voir la liste des en-têtes en `03-memoire-et-systeme-pc-e500s.md` §7) ; le détail complet des ~10 drivers dépasse le cadre de ce résumé et reste consultable dans le manuel original (`Docs/Doc technique/TechnicalReferenceManualPC-E500.pdf` et sa version mise en forme dans `Mise en forme documents SHARP/`).
 
@@ -208,5 +227,6 @@ Détail, mesures et pièges : `12-extensions-basic.md` §13 (famille 0) et §17 
 
 - `03-memoire-et-systeme-pc-e500s.md` §7 — chaîne des en-têtes IOCS installés par défaut et leurs points d'entrée.
 - `12-extensions-basic.md` §13, §14, §17 — le device 9 employé depuis une extension du BASIC, la réservation de zone par `CALL &FFFD8`, et les matrices.
-- `06-ecosysteme-outils.md` — `PLINKC162` est un exemple concret de driver IOCS tiers (lecteur `L:`) installé selon ce mécanisme.
+- `06-ecosysteme-outils.md` — `PLINKC162` est un exemple concret de driver IOCS tiers (lecteur `L:`) installé selon ce mécanisme ; `BASEXT-DRV` (device `BEXT:`) en est un second, mesuré en 2026.
+- `03-memoire-et-systeme-pc-e500s.md` §7bis — où insérer le bloc d'un pilote dans `S1:` pour qu'il ne bouge pas.
 - `SC62015Disassembler/Data/FCSFunctions.json` — sous-ensemble machine-readable utilisé par le désassembleur pour annoter les appels `CALLF FFFE4H`/`FFFE8H` dans les listings.

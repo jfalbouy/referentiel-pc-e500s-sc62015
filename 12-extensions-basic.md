@@ -13,12 +13,21 @@
 >   `BP` d'entrée − 15 (`MODE-EMPLOI.md` §6.1) ;
 > - ⛔ les tokens libres sont **86**, et non 88 : `38h` et `A6h` ont une routine sans avoir de nom
 >   (§2.3).
+>
+> **Depuis le 2026-09-15** (mise à jour du 2026-09-17) :
+>
+> - ✅ **quatorze** mots-clés : `XCONSOLE` (`CAh`) et `XCLS` (`CFh`), une fenêtre de défilement de
+>   la console, avec un **filtre d'écriture** sur le handle 0 (§17bis) ;
+> - ✅ la **désinstallation** fonctionne (piste 2 du §16) et les crochets **survivent** à `OFF`/`ON`,
+>   au petit reset et au soft RESET (piste 5) : mesurés avec `BASEXT-DRV` ;
+> - ✅ BASEXT peut **résider dans un pilote** de `S1:` et rendre la zone langage machine au BASIC :
+>   `C:\Claude\BASEXT-DRV` (§17ter).
 
 L'interpréteur BASIC du PC-E500S expose **deux crochets** par lesquels un programme en langage machine installe ses propres mots-clés. Une fois installés, ils s'emploient exactement comme ceux de la ROM : `PRINT LPEEK &BF100` et non `CALL &BF000`.
 
 Le mécanisme est **spécifié** (§7), mais aucun des projets de `C:\Claude` ne l'exploitait avant septembre 2026, et le seul exemple du corpus — `BASCOM` (TORO, 1994) — n'ajoute que des **instructions**. Les **fonctions** ont demandé une rétro-ingénierie complète, validée sur machine ; c'est l'objet principal de ce document.
 
-> **Où est le code.** Dans `C:\Claude\BASEXT\src\` : `BASEXT.ASM` (les douze mots-clés), `LSEPT.ASM` (l'ancêtre, la seule fonction `LPEEK`), `STREXT.ASM` (mise au point des fonctions chaîne), et les programmes d'essai dans `essais\`. ⛔ Ce paragraphe citait `SC62015Disassembler/Samples/LPEEK/`, dossier absent du disque (vérifié le 2026-09-15). Le détail commenté ligne à ligne est dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`. Ce document en donne le principe, pas la copie.
+> **Où est le code.** Dans `C:\Claude\BASEXT\src\` : `BASEXT.ASM` (les quatorze mots-clés — douze jusqu'au 2026-09-15 —, inclus aussi par `C:\Claude\BASEXT-DRV\src\BASEXTDR.ASM`), `LSEPT.ASM` (l'ancêtre, la seule fonction `LPEEK`), `STREXT.ASM` (mise au point des fonctions chaîne), et les programmes d'essai dans `essais\`. ⛔ Ce paragraphe citait `SC62015Disassembler/Samples/LPEEK/`, dossier absent du disque (vérifié le 2026-09-15). Le détail commenté ligne à ligne est dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`. Ce document en donne le principe, pas la copie.
 
 ---
 
@@ -413,6 +422,21 @@ silence. **La désinstallation n'est alors pas disponible.** Pour l'avoir, insta
 machine dont les crochets sont encore la sentinelle : après un RESET, avant toute autre
 extension.
 
+✅ **La désinstallation est éprouvée** (2026-09-16, `BASEXT-DRV`, routine `bd_arret`) : rendre les
+crochets depuis `old_kw`/`old_disp` **seulement s'ils désignent encore notre table** — un autre
+module a pu s'installer par-dessus. Relevé après désinstallation : crochet des noms `FFFFF`, tête
+de la chaîne IOCS `DF820`. Deux règles en sont sorties :
+
+- **refuser l'installation** tant que les crochets ne portent pas la sentinelle (l'octet haut
+  vaut `0Fh`), plutôt que d'installer avec un `old_kw` nul : c'est ce que fait l'installateur de
+  `BASEXT-DRV` (`Error: BASIC extension in use.`) ;
+- **ne jamais reconnaître son propre code par une plage d'adresses** (« entre `0BF000h` et
+  `0BFFFFh`, c'est nous ») : le test cesse d'être vrai dès que le code est relogé ailleurs, et une
+  table de relocation ne peut pas le voir, ces octets n'étant pas des champs d'adresse. Comparer
+  à l'adresse exacte.
+
+⚠️ Le module **autonome** en `0BF000h`, lui, n'a toujours **pas** d'entrée de désinstallation.
+
 ---
 
 ## 13. Le device 9 — la route est établie depuis le 2 septembre, et je l'ai ignorée
@@ -663,7 +687,20 @@ call &fffd8
 La taille demandée vaut `&006400` = 25 600 octets, et **`&BFC00 − &6400 = &B9800`** : c'est
 exactement la règle du plafond, retrouvée ici par une source indépendante de la mesure.
 
-⚠️ `CALL &FFFD8` provoque un petit reset : l'extension est à réinstaller ensuite.
+⚠️ `CALL &FFFD8` provoque un petit reset. ✅ Il **conserve** les deux crochets et la chaîne IOCS
+(mesuré le 2026-09-16 avec `BASEXT-DRV`, zone ramenée à 16 octets puis à 0) : ce qu'il met en
+jeu, c'est la **protection** du code. Un module en `BF000H` ne reste sûr que si la nouvelle
+réservation le couvre encore. `MODE-EMPLOI.md` §9.2 dit toujours « réinstaller l'extension
+ensuite », ce qui reste la conduite prudente — et de toute façon celle de la première
+installation, où le module se charge après la réservation.
+
+⛔ **Un programme d'essai ne doit jamais écrire dans le module.** `BEXTTEST.BAS` faisait
+`LPOKE &BF800`, libre quand le module faisait 1740 octets ; à 2709 octets, `0BF800h` est dans le
+filtre d'écriture de `XCONSOLE`, qui exécutait les octets écrits : la machine a perdu ses lecteurs
+(`S1:`/`S2:` NEW CARD). `TEST.BAS` et `BEXT.BAS` (`&BF300`) avaient le même défaut. **À chaque
+croissance du module, relire sa fin dans le `.lst`** et viser au-delà (aujourd'hui `&BFBF0`).
+Témoin d'un module intact : `WPEEK &BF800` = 326 (`146h`) — et non `LPEEK`, qui dépasserait
+20 bits et rendrait l'erreur 33 par construction.
 
 ### Le format des programmes d'essai
 
@@ -718,10 +755,10 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 1. **`(bp+16)` porte-t-il le premier opérande après la seconde évaluation ?** Les deux cadres
    faisant 15, il le devrait. Jamais confirmé ni infirmé (§10). Un témoin suffirait à trancher,
    et une réponse positive économiserait la mise à l'abri en RAM.
-2. **La désinstallation.** Jamais essayée. Restaurer les deux crochets depuis `old_kw` et
-   `old_disp` — donc sur une machine où ils portent la sentinelle `0FFFFFh` (§12). Vérifier
-   qu'un mot-clé retiré redevient bien un nom de variable, et ce que devient un programme déjà
-   tokenisé avec ce jeton.
+2. ✅ **~~La désinstallation~~** — **éprouvée le 2026-09-16** avec `BASEXT-DRV` : crochets rendus
+   depuis `old_kw`/`old_disp` (relus `FFFFF`), maillon IOCS délié (`DF820`), voir §12. ⚠️ Reste
+   ouvert : ce que devient un programme **déjà tokenisé** avec un jeton d'extension une fois
+   celle-ci retirée, et une entrée de désinstallation pour le module autonome.
 3. **Un mot-clé à la fois instruction ET fonction.** Six tokens de la ROM le sont, et leur
    troisième octet d'adresse porte le quartet `11` — les deux bits armés. Ils commencent tous
    par un `jp` de 3 octets, ce qui donne une seconde entrée à `+3`. Reproductible pour une
@@ -729,9 +766,14 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 4. **Le chaînage de deux modules.** Il n'existe pas : un second module écrase le premier. Mais
    rien n'interdirait à un module de **balayer d'abord la liste qu'il a sauvée** avant la
    sienne. À éprouver — c'est ce qui permettrait de composer plusieurs extensions.
-5. **Le RESET.** `F93C3H` réécrit la sentinelle dans les deux crochets. Est-elle appelée à
-   chaque RESET, ou seulement au démarrage à froid ? La réponse dit si une extension survit à
-   un RESET (le code reste en RAM ; seuls les crochets sont perdus).
+5. ✅ **~~Le RESET~~ — clos pour les gestes courants.** Avec BASEXT résident (`BASEXT-DRV`,
+   2026-09-16), les crochets **et** le maillon IOCS survivent à `OFF`/`ON`, au petit reset
+   `CALL &FFFD8` et au **soft RESET** (bouton RESET seul, sans confirmation d'initialisation) —
+   relevés de J.-F. Albouy. ⚠️ Reste à savoir quel chemin exécute `F93C3H` (la sentinelle) et
+   `0F0D9Eh`/`0F1665h` (remise de la chaîne IOCS à `DF820H`) : vraisemblablement l'initialisation
+   de la mémoire, qui efface `S1:` de toute façon. Le pilote affiche à l'installation un
+   `CALL &xxxxx` de reprise (`bd_reprise`) qui repose maillon et crochets sans installateur ; il
+   n'a jamais eu à servir.
 
 ### Sur les arguments et les types
 
@@ -900,6 +942,104 @@ fonction est appelée **pendant** l'évaluation d'une expression, une instructio
 
 ---
 
+## 17bis. `XCONSOLE` et `XCLS` — une fenêtre de défilement, et un filtre d'écriture
+
+> Détail et code : `C:\Claude\BASEXT\src\BASEXT.ASM` (commentaires de `XCONSOLE` et du filtre),
+> `README.md` et `MODE-EMPLOI.md` §10 de BASEXT. Essais : `essais/XCONTEST.BAS`, `XSCROLL.BAS`.
+
+| Mot-clé | Token | Effet |
+|---|---|---|
+| `XCONSOLE [début][,[n]]` | `CAh`, instruction | borne la console aux lignes `début`..`début+n−1` ; `XCONSOLE` seul rend l'écran entier. Refus : `début` > 3, `n` nul ou `début+n` > 4 → 33 ; une chaîne → 90 ; un séparateur autre que `,` → 10 |
+| `XCLS` | `CFh`, instruction | efface la fenêtre seule, curseur en `(0, début)` |
+
+✅ Éprouvés sur machine par J.-F. Albouy : trois fenêtres et les cinq refus (`XCONTEST.BAS`), puis
+le défilement confiné — ligne haute figée, puis haut et bas figés avec retour à la ligne
+automatique (`XSCROLL.BAS`) ; `BEXTTEST.BAS` 14/14 le 2026-09-16.
+
+### Le levier est `lcd_height`, pas le curseur
+
+La première idée — les coordonnées `0BFC27h`/`0BFC28h` — ne mène à rien. **`lcd_height`
+(`0BFC9Eh`)** est lu par le pilote d'écran pour décider du défilement, par `clear_disp` et par
+`LOCATE` : `POKE &BFC9E,n` est déjà un `XCONSOLE 0,n` sans code machine (`03` §4, mesuré). Mais la
+ROM n'a **aucune ligne de début** : son défilement part toujours de la ligne 0 et emporterait les
+lignes figées. D'où, pour `début` > 0, le filtre.
+
+### ⛔ Le filtre ne se chaîne pas dans la chaîne IOCS
+
+L'idée naturelle — un en-tête de pilote en tête de `d_link`, qui voit passer les écritures et
+transmet à l'ancien — **ne voit jamais un `PRINT`** : le FCS mémorise l'adresse d'entrée du pilote
+**à l'ouverture** du handle et y saute directement (`04` §1). `XCONSOLE` remplace donc l'adresse
+rangée en `[bloc du handle 0 + 2]` par l'entrée du filtre, et recopie l'ancienne dans les
+opérandes de ses propres sauts (auto-modification, comme `MEMCHECK`).
+
+**Le principe : défiler avant la ROM.** Pour chaque octet (`write_byte` `0Dh`, `write_block`
+`0Bh`), le filtre calcule la ligne que verra le test de défilement de la ROM (`0F2B6Ah`) ; si la
+ROM allait défiler, il défile **lui-même** les seules lignes de la fenêtre (`55h` `pattern_read`,
+`56h` `pattern_write`, `49h` `clear_line`), remonte le curseur, et transmet l'octet tel quel : le
+pilote de la ROM fait tout le reste.
+
+### Ce qu'il faut savoir en l'employant
+
+- ⛔ **La fenêtre survit à la fin du programme** : l'invite du mode direct y reste. Finir un
+  programme par `XCONSOLE` ; après une erreur ou un BREAK, MENU puis BASIC.
+- ⚠️ **`CLS` dans une fenêtre de moins de 4 lignes affiche les libellés des touches de fonction**
+  sur la ligne 3 (la ROM appelle `fkey_display` quand `lcd_height` ≠ 4, sans passer par le filtre).
+  Ce n'est pas un plantage. Dans une fenêtre, effacer par `XCLS` ; pour tout effacer,
+  `XCONSOLE : CLS`.
+- ⚠️ **Seul le handle 0 est filtré** : un `OPEN "SCRN:"` garde l'adresse de la ROM.
+- ⛔ **Ne pas recharger le module avec le filtre branché** : entre `LOAD M` et `CALL &BF000`, le
+  handle 0 désignerait du code écrasé. `XCONSOLE` d'abord ; `CALL &BF000` débranche ensuite tout
+  filtre resté en place.
+- Le module est passé de 1740 à **2709 octets** (`0BF000h`–`0BFA94h`) : voir au §14 ce que cela a
+  coûté aux programmes d'essai.
+
+---
+
+## 17ter. BASEXT résident — le pilote `BASEXT-DRV`
+
+> Référent : `C:\Claude\BASEXT-DRV\README.md` et `CONCEPTION.md`. Version 0.2 éprouvée sur
+> émulateur le 2026-09-16.
+
+**Le but** : que les mots-clés ne vivent plus dans la zone langage machine, mais dans un bloc
+`BASEXT.SYS` de `S1:` (device `BEXT:`), protégé comme un fichier. La zone redevient libre pour
+d'autres programmes, qui peuvent employer les nouvelles instructions.
+
+**Une source, deux objets.** Le code des mots-clés n'est pas recopié : `BASEXTDR.ASM` fait
+`def basext_pilote` puis `include ..\..\BASEXT\src\BASEXT.ASM`, qui masque sous `ifndef` son
+`include pce500.inc`, son `org` et son `pre_on` (`05` §3). `BASEXT.OBJ` reste **identique à
+l'octet**. Les tokens sont les mêmes : un programme tokenisé sous l'un se lit sous l'autre. On
+emploie l'un **ou** l'autre — le BASIC n'a qu'un crochet par table.
+
+```basic
+POKE &BFE03,&1A,&FD,&B,0,&18,0:CALL &FFFD8   ' reserver 6144 octets
+LOAD M "X:BASEXTDR.OBJ"                      ' ou F:
+CALL &BF000                                  ' -> Installed. Hooks: CALL &xxxxx
+POKE &BFE03,&1A,&FD,&B,&10,0,0:CALL &FFFD8   ' rendre la zone (16 octets gardes)
+```
+
+Désinstaller : recharger l'installateur, `CALL &BF000 "-U"`, puis `SET "S1:BASEXT.SYS"," "` et
+`KILL`. ⛔ **Jamais `KILL` sans `-U`** : crochets et filtre pointeraient dans de la mémoire libérée.
+
+### Ce que la mise au point a établi
+
+| Point | Établi |
+|---|---|
+| **Relocation** | 119 champs de 3 octets et 25 de 2 dans BASEXT, **mesurés** par double assemblage (`outils/reloc.py`) et vérifiés à une troisième origine ; table au format Kon (`05` §7bis). Les 14 entrées de la table de répartition portent le drapeau `4`/`8` dans leur quartet haut : la boucle doit le préserver, d'où le calcul en RAM interne repris de PLINKC. L'installateur **vérifie sa relocation sur la machine** avant de copier le bloc |
+| **Page unique** | les `call`/`jp` proches relogés imposent que le bloc tienne dans une page de 64 Ko : refus sinon (`over two pages`), comme PLINKC |
+| ⛔ **Ajout en fin de chaîne** (v0.1) | le bloc **bouge** au premier besoin de place du BASIC, sans relocation ; PockEmul s'est arrêté (`03` §7bis) |
+| ✅ **Insertion avant `DATA.BAS`** (v0.2) | bloc immobile, `TXTBAS`/`DATBAS` recalés, `BEXTTEST.BAS` 14/14 |
+| **Zone rendue** | `s1_btm` + 6128 octets = 6144 − 16 ; maillon et crochets intacts |
+| **Survie** | `OFF`/`ON`, zone à 0, petit reset, soft RESET : sans effet sur le pilote |
+| **Désinstallation** | crochets `FFFFF`, chaîne IOCS `DF820`, bloc retiré, BASIC recalé par la ROM |
+| ⚠️ **Ouvert** | le `KILL` d'un pilote installé **sous** le nôtre (limite commune avec PLINKC) ; le chemin exact qui remet la chaîne IOCS à zéro |
+
+**Deux enseignements valent pour toute extension relogeable** : aucune assertion ni aucun test
+ne doit porter sur une **adresse absolue** ou une **plage** d'adresses du module (§12) ; et la
+table de relocation se **mesure** plutôt qu'elle ne s'écrit à la main — 144 marques posées au
+milieu des instructions auraient été le point faible du projet.
+
+---
+
 ## 18. Sources
 
 - **`Nx commandes BASIC.docx`** — SynologyDrive, `Sharp PC E500S\01- Manuels et Guides\01- Basic\`. Traduction française d'un document allemand. **Dix-sept lignes qui spécifient le mécanisme** : les deux crochets, le format des deux listes, les bits 7 et 6, l'obligation de `RETF`, la retenue comme statut d'erreur, `(BP+0)` comme statut BASIC, et `X` comme pointeur de programme en entrée/sortie. C'est la source de référence ; tout le reste de ce document la complète par la lecture de la ROM et la mesure.
@@ -909,7 +1049,9 @@ fonction est appelée **pendant** l'évaluation d'une expression, une instructio
 - **Mesures sur PC-E500S et PockEmul**, septembre 2026 — la contrainte de nommage, la limite des 20 bits, le contrat de `X`, et la validation de `LPEEK` et `WPEEK`.
 - **`SC62015Disassembler/Samples/DEVICE9/`** — les sondes du Function Driver : `SQR`, `ADDTEST`, `DIVTEST` (famille 0, §13) et `MATTEST` (famille 1, §17). Chaque source consigne en en-tête le résultat observé et sa lecture.
 - **Manuels Sharp, pour les matrices** — technique, livre pp. 79-82 (PDF pp. 83-86) : les tables des trois familles ; utilisateur allemand `PC-E500S-DE.pdf`, livre pp. 138-148 (PDF pp. 146-156) : le mode MATRIX, le rangement dans les tableaux BASIC, la mémoire et les erreurs.
-- **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
+- **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15, puis à **quatorze** (`XCONSOLE`, `XCLS`) le 2026-09-16. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
+- **`C:\Claude\BASEXT-DRV\`** — BASEXT résident en pilote de `S1:` : `CONCEPTION.md` (décisions, relocation, versions 0.1 et 0.2, relevés sur émulateur), `essais/BLOCS.BAS` et `DRVTEST.BAS`, `outils/reloc.py`. Source des §§12, 16 (pistes 2 et 5) et 17ter.
+- **`Samples/Extraction/s1-1.bin`** (`SC62015Disassembler`) — la System Data Area d'un PC-E500S réel, où a été relevé le bloc de contrôle du handle 0 (§17bis).
 
 ---
 
@@ -930,6 +1072,10 @@ plusieurs arguments (§9, qui était le premier point resté ouvert), le compte 
 
 **Le 2026-09-14** : la famille **matrices** du device 9 (§17) — contrat lu sur le code et les deux
 manuels, transposée et déterminant mesurés par `MATTEST`, puis chantier suspendu à la demande.
+
+**Les 2026-09-15 et 16** : `XCONSOLE` et `XCLS`, et le filtre d'écriture qui a montré que le FCS
+ne passe pas par la chaîne IOCS (§17bis) ; BASEXT résident en pilote, qui a clos la
+désinstallation et la survie des crochets (§12, §16 pistes 2 et 5, §17ter).
 
 **Reste ouvert** : les pistes du §16, dont quatre sur les matrices et les statistiques (14 à 17).
 ✅ Le retour d'une **chaîne**, longtemps ouvert, est établi depuis le 2026-09-15 : voir

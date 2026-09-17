@@ -21,7 +21,7 @@ Quatre générations coexistent dans l'écosystème du projet :
 |---|---|---|
 | **XASM 1.40** | `XASM Origine/` | Original historique en C (DOS), syntaxe et mnémoniques de référence. |
 | **xasm2026-1 / xasm2026-1-2** | `xasm2026-1-2/` | Port maintenu en C11 moderne (GCC/CMake), sorties étendues (Intel HEX, S-Record, MAP, dépendances, UU, dump HxD), compatibilité **octet par octet** vérifiée contre l'original. C'est le « moteur C » dont les bornes sont décrites au §2. |
-| **xasm2026-4** | `xasm2026-4/` | Réécriture C# (.NET 8), non-régression **bit-exacte** contre `xasm2026-1`. Reproduit en plus le **préprocesseur de l'assembleur A62 (N. Kon)** — `rel` et la table de relocation — ce qui assemble telles quelles les sources des drivers `ssfdc120` et `PLINKC`. Documentation complète : `xasm2026-4/Documentation/Documentation_XASM2026-4_PC-E500S.md`. |
+| **xasm2026-4** | `xasm2026-4/` | Réécriture C# (.NET 8), non-régression **bit-exacte** contre `xasm2026-1`. Reproduit en plus le **préprocesseur de l'assembleur A62 (N. Kon)** — `rel` et la table de relocation — ce qui assemble telles quelles les sources des drivers `ssfdc120` et `PLINKC`. Documentation complète : `xasm2026-4/Documentation/Documentation_XASM2026-4_PC-E500S.md`. ⚠️ Trois défauts d'encodage silencieux y ont été corrigés en septembre 2026 (§7bis) : **un objet antérieur au 2026-09-17 qui emploie les formes concernées est à réassembler.** |
 
 ## 2. Syntaxe source
 
@@ -74,6 +74,15 @@ LABEL:  INSTRUCTION  OPERANDE1,OPERANDE2   ; commentaire
 | `DEF`/`UNDEF`, `IFDEF`/`IFNDEF`/`ELSE`/`ENDIF` | Symboles et assemblage conditionnel. |
 | `LOCAL` / `ENDL` | Blocs de labels hiérarchiques (voir §3.1). |
 
+> ⛔ **`IFDEF`/`IFNDEF` ne voient que les symboles posés par `DEF`, jamais ceux d'un `EQU`.** Mesuré le 2026-09-16 en rendant `BASEXT.ASM` incluable par `BASEXT-DRV` : avec `basext_pilote: equ 1`, l'include de `pce500.inc` semblait masqué, mais l'`org 0BF000H` passait (`Code: 0BE000h - 0BFA94h`) ; avec `def basext_pilote`, tout est masqué. C'est la bonne façon de rendre une source **à la fois autonome et incluable** :
+>
+> ```asm
+>         ifndef  basext_pilote       ; pose par « def basext_pilote » chez l'includeur
+>         org     0BF000H
+>         pre_on
+>         endif
+> ```
+
 Extensions `xasm2026-1`/`xasm2026-1-1` : `REPEAT`/`ENDR`, `IFEQ`/`IFNE`/`IFGT`/`IFLT`, `STRUCT`/`ENDS` (calcule `NOM_SIZE`), `SECTION` (regroupement pour rapport `-R`/MAP).
 
 ### 3.1 Labels hiérarchiques
@@ -119,6 +128,8 @@ Table de `xasm2026-4` (`xasm2026-4/README.md`, analysée dans `src/CommandLineOp
 Inclure `pce500.inc` (près de 280 `EQU`) noie le `.lst`. **`-K`** (avec `-L`) n'y conserve, **des fichiers inclus**, que les constantes `EQU` effectivement **référencées** par le programme ; tout ce qui n'émet pas d'octet et n'est pas une constante utilisée est masqué, **la source principale restant intégrale**. Sur `example.asm`, le listing passe de 357 à 36 lignes.
 
 C'est un **filtre de listing pur** : l'objet et toutes les autres sorties sont identiques avec ou sans `-K`. Les sorties de référence des tests de `xasm2026-4` étant produites sans `-K`, elles ne bougent pas.
+
+⚠️ **`-K` masque, dans un fichier inclus, TOUTE ligne qui n'émet pas d'octet** — commentaires et étiquettes seules compris. Sans conséquence pour `pce500.inc` ; mais quand l'include porte du **code** (une source entière incluse par une autre, comme `BASEXT.ASM` dans `BASEXT-DRV`), le listing perd tous ses commentaires et des étiquettes qu'on vient y relire (`kw_table:`) : 816 lignes sur 2429 mesurées. Assembler alors **sans `-K`**.
 
 ### La commande canonique pour un programme destiné à la machine
 
@@ -203,6 +214,22 @@ Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur
 | `EOF comes before END` | `END` manquant. | Ajouter `END`. |
 | `Label format error` **sur une ligne saine** | ⛔ La ligne **précédente** dépasse 253 caractères et a été coupée en deux par le moteur C (voir §2). | Raccourcir la ligne d'**avant**, pas celle que le message désigne. |
 | `Location counter wandered` | `ORG` répété/instable. | Préférer `DS` pour combler un espace. |
+| `Undefined instruction` sur `cmp a,(n)`, `test a,(n)`, `test (m),(n)` | Ces formes **n'existent pas** dans le jeu SC62015 (§7bis). | Écrire `cmp (n),a` en **inversant la condition** qui suit ; voir `xasm2026-4/Exemples/TUTORIEL/10_cmp_test_formes.asm`. |
+| `rel` : « l'instruction ne porte aucune adresse absolue » | `rel` devant une instruction qui ne porte pas **exactement une** adresse `mn` ou `lmn` (`mv a,05H`, `jr`, `db`, `dw` à plusieurs valeurs). | Retirer `rel` : il n'y a rien à reloger. |
+
+## 7bis. Trois défauts silencieux de `xasm2026-4`, corrigés en septembre 2026
+
+Aucun ne produisait de message : l'objet sortait, faux. Tous trois ont été trouvés en confrontant `xasm2026-4` au **moteur C** (`xasm2026-1-2`) ou à une **mesure**, jamais par la relecture du listing — c'est la méthode à garder.
+
+| Défaut | Ce qui sortait | Corrigé | Rapport |
+|---|---|---|---|
+| **`cmp a,(n)` accepté** (et `cmp a,(BP+n)`) | `62 nn` : `62h` est `CMP [lmn],n`, **5 octets** ; le CPU avalait les 3 octets suivants et l'exécution se désynchronisait (retour au MENU sous PockEmul). Même défaut sur `test a,(n)` (`6Bh` = `XOR (n),A`, qui **écrit** en mémoire) et `test (m),(n)` (`6Ah`, tronqué). Le moteur C les refuse | 2026-09-15 : refusées (`Undefined instruction`) | `xasm2026-4/RAPPORT-BUG-cmp-a-parentheses.md` |
+| **Octet PRE omis, déplacé ou dédoublé** | Sous `pre_on` : `mvp [r3],(n)` **sans PRE** (`EA 05 0B` au lieu de `30 EA 05 0B` : l'écriture part en `(BP+0Bh)`), `mvw [r3],(n)` et `mvl (n),[lmn]`/`[lmn],(n)` avec le PRE **après** l'opcode, famille `F0h`-`FBh` avec deux PRE simples au lieu d'un combiné, `jp (n)` assemblé en saut direct, `mv s,[(n)]` accepté. Mesuré sur **2520 formes** : 224 divergences sous `pre_on`, 65 sous `pre_off`, neuf défauts | 2026-09-17 : **0 divergence** sur 2520 formes contre le moteur C | `xasm2026-4/RAPPORT-BUG-octet-pre.md` |
+| **Préfixe `rel` : champ d'adresse mal situé** | La position du champ était **déduite de la fin** de l'instruction : fausse quand un octet suit l'adresse (`cmp/test/and/or/xor [lmn],n`, `mv`..`mvl [lmn],(n)`), pour `jpz/jpnz/jpc/jpnc` (3 octets en +0 au lieu de 2 en +1 : l'**opcode** aurait été relogé) et pour `dw` — 14 formes sur 29. `rel` devant une instruction sans adresse encodait un écart négatif en `0FFh`, le **terminateur** de la table. Mesuré sur BASEXT : 12 entrées décalées, **48 octets faux** après relocation | 2026-09-17 : le champ est **relevé à l'émission** ; sur les 144 sites de BASEXT, table identique à la mesure de `BASEXT-DRV/outils/reloc.py`, **0 octet faux** | `xasm2026-4/RAPPORT-BUG-rel-champ-adresse.md` |
+
+Réponse de `xasm2026-4` et vérification : `xasm2026-4/REPONSE-RAPPORTS-BUG-octet-pre-et-rel.md` ; contre-vérification indépendante dans `C:\Claude\BASEXT-DRV\CONCEPTION.md` §3.4. Les objets de référence (`REGISTER`, `TMAP2020`, `VOGUE`, `PLINKC.OBJ`, BASEXT) sont **inchangés à l'octet** : aucun n'employait les formes fautives.
+
+> **Le format de table de relocation Kon** (celui de `rel`, de `PLINKC` et de `BASEXT-DRV`) : un octet par champ, écart depuis le champ précédent (le premier depuis l'origine) ; bit `080h` = champ de 3 octets, absent = 2 octets ; `07Eh` = écart long sur 2 octets qui suivent ; `0FFh` = fin. **Une relocation doit préserver le quartet haut** d'un champ de 3 octets : c'est là que la table de répartition du BASIC porte son drapeau instruction/fonction (`12-extensions-basic.md` §3). La boucle de PLINKC le garantit en calculant **en RAM interne** (`mvp`/`sbcl`/`mvp`), sans passer par un registre de 20 bits.
 
 ## 8. Voir aussi
 
