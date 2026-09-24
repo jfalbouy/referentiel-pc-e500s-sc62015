@@ -1046,8 +1046,8 @@ milieu des instructions auraient été le point faible du projet.
 
 ## 17quater. History en pilote — `HISTDRV`, et la version de la ROM
 
-> Référent : `C:\Claude\HIS111\HISTDRV\README.md`. Version 0.2 éprouvée sur émulateurs PC-E500S
-> et PC-E500 le 2026-09-24.
+> Référent : `C:\Claude\HIS111\HISTDRV\README.md` (dépôt privé `sharp-pce500s-keyboard_history`).
+> Version 0.2 **validée sur PC-E500S réel** et sur émulateurs PC-E500S et PC-E500 le 2026-09-24.
 
 **History 1.11** (TORO, 1994) rappelle les lignes du mode direct : CTRL + ← / → parcourt les
 lignes validées, CTRL + I tabule. Ce n'est pas un mot-clé : il détourne le **vecteur de
@@ -1077,11 +1077,12 @@ de TORO — en `(BP+2Ah)`/`(BP+2Bh)` (`03` §3bis). D'où la version 0.2 :
 - `construire.py` vérifie que chaque site vise un octet `2Bh`/`2Ch` et qu'aucune utilisation des
   deux constantes n'y manque ; l'image adaptée égale l'assemblage direct avec `2Ah`/`2Bh`.
 
-| Essai (émulateur, 2026-09-24) | Bloc | Reprise | Résultat |
+| Essai (2026-09-24) | Bloc | Reprise | Résultat |
 |---|---|---|---|
 | PC-E500S, 0.1 | `080018h` | `&8004E` | installation, `FILES`, `HISTTEST` ✅ ; CTRL + ← ⛔ sans effet |
 | PC-E500S, 0.2 | `080018h` | `&8004E` | ✅ tout fonctionne |
 | PC-E500, 0.2 | `0B8018h` | `&B804E` | ✅ tout fonctionne — réservation `CALL &FFFD8` et adaptation 5.x–7.x comprises |
+| **PC-E500S réel**, 0.2 | — | — | ✅ tout fonctionne, **désinstallation** comprise (J.-F. Albouy) |
 
 **L'enseignement** : un programme qui partage les variables d'une routine de la ROM (ici les
 `(BP+n)` de l'éditeur) dépend de la **révision** de la ROM, pas seulement du modèle. Le vérifier
