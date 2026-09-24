@@ -1,5 +1,7 @@
 # Mémoire et système du PC-E500S
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-24*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier détaille la carte mémoire du PC-E500S (interne + externe), les registres d'E/S, les vecteurs d'interruption et les points d'entrée IOCS. Sources principales : le manuel *ESR-L CPU Instruction Manual*, le *Technical Reference Manual PC-E500*, et la feuille de dépouillement `Docs/Doc technique/PCE500 Description mémoire.xls.xlsx` déjà constituée dans le projet `SC62015Disassembler` (adresses recoupées avec des listings XASM réels).
 
 ## 1. Vue d'ensemble
@@ -75,13 +77,50 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 |---|---|---|
 | `CBH` | `TXTBAS` | Adresse (3 octets) où réside `TEXT.BAS` courant. |
 | `CEH` | `DATBAS` | Adresse où réside `DATA.BAS` courant. ⚠️ Ces deux blocs **bougent** quand un pilote s'insère avant eux : l'installateur doit recaler `TXTBAS`/`DATBAS` (§7bis). |
-| `D1H` | `BASPTR` | **Pointeur** (3 octets) vers la zone de travail de l'interpréteur BASIC. Nommé `BASWRK` jusqu'en septembre 2026 — même nom que la zone externe `BFD0EH`, ce qui rendait l'adresse interne innommable dans une source et a coûté une dizaine d'essais : voir `12-extensions-basic.md` §7. Porte les crochets d'extension du BASIC en `[(0D1H)+090H]` et `[(0D1H)+093H]`. |
+| `D1H` | `BASPTR` | **Pointeur** (3 octets) vers la zone de travail de l'interpréteur BASIC. Nommé `BASWRK` jusqu'en septembre 2026 — même nom que la zone externe `BFD0EH`, ce qui rendait l'adresse interne innommable dans une source et a coûté une dizaine d'essais : voir `12-extensions-basic.md` §7. Porte les crochets d'extension du BASIC en `[(0D1H)+090H]` et `[(0D1H)+093H]`, et en `[(0D1H)+00BH]` le **vecteur d'extension de l'éditeur** du mode direct (§3bis). |
 | `D4H`/`D5H` | `BL`/`BH` | Registre `B` étendu (paire haute/basse, usage interne interpréteur). |
 | `D6H`/`D7H` | `CL`/`CH` | Registre `C` étendu. |
 | `D8H`/`D9H` | `DL`/`DH` | Registre `D` étendu. |
 | `DAH` | `SI` | Pointeur source, 3 octets. |
 | `DDH` | `DI` | Pointeur destination, 3 octets. |
 | `E6H` | `IOCSW` | Zone de travail IOCS (interne). |
+
+## 3bis. L'éditeur du BASIC : ses variables sont relatives à `BP`, et le PC-E500S les a décalées
+
+L'éditeur de ligne du mode direct appelle, **à chaque touche**, le vecteur `[(0D1H)+00BH]` :
+`mv x,[(basptr)+0Bh]` puis `callf` vers un `jp x` (`0F2D61h` → `0F1786h` dans `rom83`). L'appel est
+**inconditionnel** : le vecteur désigne toujours une routine valide, et un programme qui le
+détourne peut rendre la main à l'ancien par `jpf`. C'est le crochet de **History** (TORO, 1994),
+devenu le pilote `HISTDRV` en septembre 2026 (`12-extensions-basic.md` §17quater).
+
+Le code appelé partage les variables de l'éditeur, que la ROM lit **sans octet PRE** : ce sont des
+`(BP+n)` (`01` §3.3). Celles qu'emploie History :
+
+| `(BP+n)` | Rôle |
+|---|---|
+| `00h` | pointeur (3 o) de la ligne saisie |
+| `07h` | longueur de la ligne |
+| `0Ah` | bit 7 : mode PRO (édition d'un texte BASIC) |
+| `08h`, `0Eh`, `10h`, `12h` | position et état d'édition, remis à jour en fin de commande étendue |
+| `17h` | colonne du curseur |
+| `2Ah`/`2Bh`, ou `2Bh`/`2Ch` | **code étendu / caractère de la touche** — selon la ROM, voir ci-dessous |
+
+⛔ **Le code de la touche n'est pas au même endroit selon la ROM.** Mesuré à l'appel du vecteur
+dans les trois images, le 2026-09-24 :
+
+| ROM | Machine | Instruction avant l'appel | Code étendu | Caractère |
+|---|---|---|---|---|
+| 5.3 | PC-E500, série ancienne | `0F3714h` `mv (2Ah),ba` | `(BP+2Ah)` | `(BP+2Bh)` |
+| 7.5 | PC-E500 BL / E550 | `0F3764h` `mv (2Ah),ba` | `(BP+2Ah)` | `(BP+2Bh)` |
+| **8.3** | **PC-E500S** | `0F2D61h` **`mv (2Bh),ba`** | **`(BP+2Bh)`** | **`(BP+2Ch)`** |
+
+Les offsets `00h` à `22h` n'ont **pas** bougé : les deux éditeurs, 5.3 et 8.3, alignés instruction
+par instruction (1 896 paires), emploient les mêmes, et `17h` (colonne) a les mêmes usages dans les
+deux ROM. Le code de la touche, lui, **est le même** : CTRL + ← donne le code étendu `5Dh`,
+CTRL + → `5Ch`, dans les deux (§4, tables du clavier). Un programme écrit pour l'E500 lit donc,
+sur l'E500S, **l'octet d'à côté** — c'est pourquoi History 1.11 « ne fait rien » sur un PC-E500S
+(mesuré sur émulateur). La seule façon, pour un programme, de savoir où lire est la **version de
+la ROM** (§8) : `HISTDRV` la lit à l'installation.
 
 ## 4. Mémoire externe : zones système principales
 
@@ -90,7 +129,7 @@ Ces adresses ne sont pas documentées dans le manuel CPU (qui ne décrit que `EC
 | `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
 | `BFC27`/`BFC28` | `SCRNX`/`SCRNY` | Prochaine coordonnée d'affichage sur `STDO:`/`SCRN:`. |
 | `BFC2A` | `LINPTN` | Cadre de points affiché dans une boîte 16 points. |
-| `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). |
+| `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). ✅ Six pointeurs, dans l'ordre de `pce500.inc` : `keytbl_1b`, `keytbl_2b`, `keytbl_1b_shift`, `keytbl_2b_shift`, `keytbl_1b_ctrl`, `keytbl_2b_ctrl`, déposés par la commande clavier `3Fh` depuis `0F1C6Dh` (`rom83`) : `0307A4h`, `030806h`, `03092Ch`, `03098Eh`, `030868h`, `0308CAh` — **l'ordre en mémoire (S3EXT) n'est pas celui des pointeurs**. Dans la table CTRL à 2 octets, ← (code matriciel `1Dh`) donne `5Dh` et → (`1Ch`) `5Ch` ; les six tables se retrouvent à l'identique dans `rom53` (à partir de `0F3422h`). |
 | `BFC6D` | `FHANDLE` | Table des handles de fichiers ouverts. |
 | `BFC7D` | `DEFDRV` | Nom du lecteur par défaut (7 octets, ex. `F:____0`). |
 | `BFC84`–`BFC96` | — | Adresses (3 octets chacune) des polices de caractères par plage de codes (0-1F, 20-7F, 80-9F, A0-DF, E0-FF) + `DOTSOP` (mode d'affichage précédent). |
@@ -205,6 +244,7 @@ Autres faits mesurés au passage :
 - ✅ **`s1_btm` suit la réservation de la zone langage machine octet pour octet** : réserver 6144 octets l'abaisse de 6144, revenir à 16 le remonte de 6128, et `DATA.BAS` reprend la place.
 - ✅ Après `KILL` d'un bloc, **la ROM recale elle-même** `TXTBAS`/`DATBAS`.
 - 📖 Un bloc **`ENG     $$$`** peut apparaître : c'est un fichier de travail de la ROM (`"S1:ENG     .$$$"` en `0DF995h`, voisin du catalogue de formules), pas un pilote.
+- ✅ **Un deuxième pilote au même modèle** : `HISTORY.SYS` (`HISTDRV`, 851 octets, `FILES` 817) s'insère en **`080018h`** sur PC-E500S et en **`0B8018h`** sur PC-E500, en tête de `S1:`, devant `DATA.BAS` — émulateurs, 2026-09-24 (`12-extensions-basic.md` §17quater).
 - ⚠️ **Limite connue, commune avec PLINKC** : un pilote inséré **sous** un autre puis supprimé par `KILL` fait descendre celui du dessus, sans relocation. Non mesuré.
 
 ## 8. Zone haute fixe (`FFFD8H`–`FFFFFH`)
@@ -216,7 +256,7 @@ Autres faits mesurés au passage :
 | `FFFE4H` | Point d'entrée **FCS** (`callf fcs_call`) — voir `04-fcs-iocs.md`. |
 | `FFFE8H` | Point d'entrée **IOCS** (`callf iocs_call`), entrée principale du BIOS. |
 | `FFFF0H` | Version majeure ROM (`8` = famille PC-E500S, dont le PC-U6000 ; `7` = PC-E500 et PC-E550 ; `5` = série ancienne de PC-E500). |
-| `FFFF1H` | Version mineure ROM — **elle varie** : `8.3` PC-E500S, `8.4` PC-U6000, `7.2` PC-E500 japonais, `7.3` PC-E500, `7.5` PC-E500-BL et PC-E550, `5.3` série ancienne (`SC62015Disassembler/Data/RomVersions.csv`). ⛔ Une version antérieure écrivait « `3` pour les deux modèles ». |
+| `FFFF1H` | Version mineure ROM — ✅ **c'est elle qui dit où l'éditeur range sa touche** (§3bis) : `HISTDRV` la lit à l'installation et adapte son image. **Elle varie** : `8.3` PC-E500S, `8.4` PC-U6000, `7.2` PC-E500 japonais, `7.3` PC-E500, `7.5` PC-E500-BL et PC-E550, `5.3` série ancienne (`SC62015Disassembler/Data/RomVersions.csv`). ⛔ Une version antérieure écrivait « `3` pour les deux modèles ». |
 | `FFFF2H`–`FFFF9H` | Réservé / non documenté. |
 | `FFFFAH`–`FFFFCH` | **Vecteur d'interruption matériel** (3 octets, pointeur). |
 | `FFFFDH`–`FFFFFH` | **Vecteur RESET** (3 octets) — saute vers le lancement du menu BASIC. |

@@ -1,5 +1,7 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
+*Rédigé le 2026-09-03 — mis à jour le 2026-09-24*
+
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
 > projet transverse et son document de référence : les 168 instructions standard (lues dans
@@ -22,6 +24,10 @@
 >   au petit reset et au soft RESET (piste 5) : mesurés avec `BASEXT-DRV` ;
 > - ✅ BASEXT peut **résider dans un pilote** de `S1:` et rendre la zone langage machine au BASIC :
 >   `C:\Claude\BASEXT-DRV` (§17ter).
+>
+> **Le 2026-09-24** : ✅ un **deuxième pilote** au même modèle, **History** (TORO, 1994), qui
+> détourne le vecteur de l'**éditeur** et non les crochets des mots-clés ; il **lit la version de
+> la ROM** parce que l'E500S range la touche un octet plus loin que l'E500 (§17quater).
 
 L'interpréteur BASIC du PC-E500S expose **deux crochets** par lesquels un programme en langage machine installe ses propres mots-clés. Une fois installés, ils s'emploient exactement comme ceux de la ROM : `PRINT LPEEK &BF100` et non `CALL &BF000`.
 
@@ -1038,6 +1044,50 @@ ne doit porter sur une **adresse absolue** ou une **plage** d'adresses du module
 table de relocation se **mesure** plutôt qu'elle ne s'écrit à la main — 144 marques posées au
 milieu des instructions auraient été le point faible du projet.
 
+## 17quater. History en pilote — `HISTDRV`, et la version de la ROM
+
+> Référent : `C:\Claude\HIS111\HISTDRV\README.md`. Version 0.2 éprouvée sur émulateurs PC-E500S
+> et PC-E500 le 2026-09-24.
+
+**History 1.11** (TORO, 1994) rappelle les lignes du mode direct : CTRL + ← / → parcourt les
+lignes validées, CTRL + I tabule. Ce n'est pas un mot-clé : il détourne le **vecteur de
+l'éditeur** `[(basptr)+0Bh]`, que la ROM appelle à chaque touche (`03` §3bis). Son installateur
+d'origine, le « Tsr block maker », relogeait le TSR en décodant ses opcodes (table de 256
+longueurs, adresses repérées à leur octet fort `0Eh`) et l'insérait **sans recaler**
+`TXTBAS`/`DATBAS`.
+
+**Ce qui a été repris de `BASEXT-DRV` tel quel** : l'installateur entier (insertion avant
+`DATA.BAS`, `linkbas`, page unique, relocation mesurée par `reloc.py` et **vérifiée sur la
+machine** sur trois champs, reprise `CALL &xxxxx`, désinstallation `-U`). Le premier essai l'a
+confirmé sans retouche : bloc en tête de `S1:`, maillon et crochet posés. **Ce qui a changé** :
+le tampon d'historique (110h octets) est **dans le bloc**, au lieu d'une zone système `[0BFCF6h]`
+réservée par IOCS `42h` ; le décrochage (`@[+/-]` ou `-U`) ne rend le vecteur **que s'il désigne
+encore History** — sinon une extension accrochée après lui sauterait dans le vide.
+
+**Ce que l'essai a appris** : sur PC-E500S, CTRL + ← **ne faisait rien**. La touche arrivait,
+mais l'éditeur de la ROM 8.3 la range en `(BP+2Bh)`/`(BP+2Ch)`, et celui des ROM 5.3 et 7.5 — celles
+de TORO — en `(BP+2Ah)`/`(BP+2Bh)` (`03` §3bis). D'où la version 0.2 :
+
+- la source est écrite pour la 8.3, par deux constantes (`ed_etendu`, `ed_touche`) ;
+- l'installateur lit `[0FFFF0h]`.`[0FFFF1h]`, affiche `ROM x.y`, et **retranche 1 aux six octets
+  d'offset** de l'image (`sites_touche`) sur une ROM 5.x–7.x, **avant** la copie ; toute autre
+  version est refusée (8.4 / PC-U6000 non mesurée) ;
+- **un seul objet** pour les deux machines, et aucun test à chaque touche : le bloc résident est
+  le code de l'une ou de l'autre ;
+- `construire.py` vérifie que chaque site vise un octet `2Bh`/`2Ch` et qu'aucune utilisation des
+  deux constantes n'y manque ; l'image adaptée égale l'assemblage direct avec `2Ah`/`2Bh`.
+
+| Essai (émulateur, 2026-09-24) | Bloc | Reprise | Résultat |
+|---|---|---|---|
+| PC-E500S, 0.1 | `080018h` | `&8004E` | installation, `FILES`, `HISTTEST` ✅ ; CTRL + ← ⛔ sans effet |
+| PC-E500S, 0.2 | `080018h` | `&8004E` | ✅ tout fonctionne |
+| PC-E500, 0.2 | `0B8018h` | `&B804E` | ✅ tout fonctionne — réservation `CALL &FFFD8` et adaptation 5.x–7.x comprises |
+
+**L'enseignement** : un programme qui partage les variables d'une routine de la ROM (ici les
+`(BP+n)` de l'éditeur) dépend de la **révision** de la ROM, pas seulement du modèle. Le vérifier
+se fait en **alignant** les deux routines, et la version se lit en `0FFFF0h` ; la corriger à
+l'installation coûte une table de sites et une boucle de six lignes.
+
 ---
 
 ## 18. Sources
@@ -1051,6 +1101,7 @@ milieu des instructions auraient été le point faible du projet.
 - **Manuels Sharp, pour les matrices** — technique, livre pp. 79-82 (PDF pp. 83-86) : les tables des trois familles ; utilisateur allemand `PC-E500S-DE.pdf`, livre pp. 138-148 (PDF pp. 146-156) : le mode MATRIX, le rangement dans les tableaux BASIC, la mémoire et les erreurs.
 - **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15, puis à **quatorze** (`XCONSOLE`, `XCLS`) le 2026-09-16. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
 - **`C:\Claude\BASEXT-DRV\`** — BASEXT résident en pilote de `S1:` : `CONCEPTION.md` (décisions, relocation, versions 0.1 et 0.2, relevés sur émulateur), `essais/BLOCS.BAS` et `DRVTEST.BAS`, `outils/reloc.py`. Source des §§12, 16 (pistes 2 et 5) et 17ter.
+- **`C:\Claude\HIS111\`** — History 1.11 (TORO, 1994) et `HISTDRV` : source du §17quater ; les images `rom53.bin`, `rom75.bin`, `rom83.bin` et `S3EXT.bin` de `SC62015Disassembler/Samples/ROM/` pour la disposition de l'éditeur et les tables du clavier.
 - **`Samples/Extraction/s1-1.bin`** (`SC62015Disassembler`) — la System Data Area d'un PC-E500S réel, où a été relevé le bloc de contrôle du handle 0 (§17bis).
 
 ---
@@ -1076,6 +1127,9 @@ manuels, transposée et déterminant mesurés par `MATTEST`, puis chantier suspe
 **Les 2026-09-15 et 16** : `XCONSOLE` et `XCLS`, et le filtre d'écriture qui a montré que le FCS
 ne passe pas par la chaîne IOCS (§17bis) ; BASEXT résident en pilote, qui a clos la
 désinstallation et la survie des crochets (§12, §16 pistes 2 et 5, §17ter).
+
+**Le 2026-09-24** : History en pilote (§17quater), et la découverte que l'éditeur de l'E500S
+range la touche un octet plus loin que celui de l'E500 (`03` §3bis).
 
 **Reste ouvert** : les pistes du §16, dont quatre sur les matrices et les statistiques (14 à 17).
 ✅ Le retour d'une **chaîne**, longtemps ouvert, est établi depuis le 2026-09-15 : voir

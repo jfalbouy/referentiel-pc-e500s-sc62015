@@ -1,5 +1,7 @@
 # Formats de fichiers et assembleur XASM
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-24*
+
 > Voir `00-index.md` pour la vue d'ensemble. Synthèse de `SC62015Disassembler/Docs/Doc technique/Documentation_XASM_PC-E500S.md` (déjà très complet) et du `README.md`/`CLAUDE.md` de `SC62015Disassembler` pour le point de vue « lecture » des mêmes formats.
 
 ## 1. Généalogie de l'outil
@@ -230,6 +232,26 @@ Aucun ne produisait de message : l'objet sortait, faux. Tous trois ont été tro
 Réponse de `xasm2026-4` et vérification : `xasm2026-4/REPONSE-RAPPORTS-BUG-octet-pre-et-rel.md` ; contre-vérification indépendante dans `C:\Claude\BASEXT-DRV\CONCEPTION.md` §3.4. Les objets de référence (`REGISTER`, `TMAP2020`, `VOGUE`, `PLINKC.OBJ`, BASEXT) sont **inchangés à l'octet** : aucun n'employait les formes fautives.
 
 > **Le format de table de relocation Kon** (celui de `rel`, de `PLINKC` et de `BASEXT-DRV`) : un octet par champ, écart depuis le champ précédent (le premier depuis l'origine) ; bit `080h` = champ de 3 octets, absent = 2 octets ; `07Eh` = écart long sur 2 octets qui suivent ; `0FFh` = fin. **Une relocation doit préserver le quartet haut** d'un champ de 3 octets : c'est là que la table de répartition du BASIC porte son drapeau instruction/fonction (`12-extensions-basic.md` §3). La boucle de PLINKC le garantit en calculant **en RAM interne** (`mvp`/`sbcl`/`mvp`), sans passer par un registre de 20 bits.
+
+## 7ter. Convertir une source d'un autre assembleur — l'exemple de History 1.11
+
+`C:\Claude\HIS111\hist111.asm` (TORO, 1994, assembleur de *Katsuyō Kenkyū* 活用研究, Shift-JIS)
+a été converti en `history.asm`, qui redonne `history.bin` **à l'octet**, sauf les trois octets de
+la somme de contrôle, calculée et rangée par le premier `CALL` avant diffusion. Ce que la conversion
+a demandé, et qui vaut pour toute source de cette famille :
+
+| Original | `xasm2026-4` | Pourquoi |
+|---|---|---|
+| `ORG 0E0000H,0BE300H` (adresse logique, adresse physique) | `org 0BE300h` puis `phase 0E0000h` … `dephase` | les labels à l'adresse logique, les octets à leur place |
+| un `ORG` qui **revient en arrière** (TSR en `0BE300h`, puis installateur en `0BE000h`) | **remettre les segments dans l'ordre croissant**, combler par `ds cible-*,0` | ⛔ `xasm2026-4` **concatène** les segments dans l'ordre du source et prend l'adresse la plus basse pour l'en-tête : l'objet sort **faux, sans aucun message** (mesuré le 2026-09-24) |
+| `PRE 30H MV Y,[(BASWRK)+0BH]` sur une ligne | `pre 30h` sur sa propre ligne, **sans** `pre_on` | les accès `(n)` sans PRE de l'original sont voulus : ce sont des `(BP+n)` |
+| `HISIZE EQU 110H` | `hisize: equ 110h` | le `:` est obligatoire, même devant `EQU` (§2) |
+| labels `@TIT`, `@@START`, `@` | acceptés tels quels | — |
+| `DB 0FDH,35H ;MV I,Y` | `mv i,y` | mêmes octets (`FD 35`, et `FD 24` pour `mv ba,x`) |
+| une **tabulation** dans une chaîne `DM` | des espaces | l'assembleur d'origine la convertissait : `history.bin` contient 8 espaces là où la source a une tabulation et 7 espaces |
+
+Vérification : l'objet réassemblé est comparé à `history.bin`, puis **désassemblé** par
+`e500dasm`, et l'export `asm` réassemblé redonne les deux parties à l'octet.
 
 ## 8. Voir aussi
 
