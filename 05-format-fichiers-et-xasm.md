@@ -179,7 +179,9 @@ FF 00 06 01 10 61 38 00 00 98 0B FF FF FF 00 0F
 ### 5.1bis L'enveloppe texte — **quatre** formes, pas une
 
 > **Référent : `C:\Claude\UUENCODE-UUDECODE\FORMATS.md`** (comparaison structure par structure,
-> sommes de contrôle comprises). Ce paragraphe n'en donne que la clé de lecture.
+> sommes de contrôle comprises) — document d'un **dépôt privé**, qui conserve les binaires de 1993 et
+> les sources japonaises d'époque. Ce paragraphe se lit donc **sans lui** : il en porte la clé de
+> lecture et les mesures, et c'est le détail octet par octet qui reste dans le référent.
 
 ⛔ **Deux fichiers portant tous deux l'extension `.UUE` peuvent ne pas avoir la même structure**,
 selon qu'ils viennent du PC ou de la machine. C'est la source d'erreur principale du transport

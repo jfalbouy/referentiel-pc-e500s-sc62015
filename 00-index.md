@@ -28,6 +28,23 @@ Référentiel technique en français sur le Sharp PC-E500S et son CPU **SC62015 
 - Pour vérifier ou sourcer une affirmation : `07`.
 - Pour ajouter une instruction ou une fonction au BASIC : **`C:\Claude\BASEXT\MODE-EMPLOI.md`**, le référent ; `12` pour l'histoire des mesures, `03` (la zone de travail) et `05` (la syntaxe XASM).
 
+## Conventions de renvoi — ce qui est public, ce qui ne l'est pas
+
+Ce référentiel a été écrit d'abord pour un poste de travail, et publié ensuite. Ses renvois sont
+donc de trois sortes, qu'il faut distinguer :
+
+- **`C:\Claude\…`** — un dossier du poste de l'auteur. Quand le projet correspondant est publié, le
+  [`README`](README.md) en donne le lien : `BASEXT`, `BASEXT-DRV`, `PLINKC`, XASM, `renum`,
+  transfert série. Sinon le renvoi vaut comme **référence, pas comme lien** ;
+- **un dépôt privé**, dit tel quel dans le texte (`sharp-pce500s-keyboard_history`,
+  `sharp-pce500s-uuencode`) : il porte du code tiers que l'auteur ne redistribue pas. Ce que le
+  référentiel en tire est **écrit dans ses chapitres**, qui se lisent sans lui ;
+- **un document tiers non redistribué** — manuels Sharp, archives japonaises, photos : voir
+  [`NOTICE.md`](NOTICE.md).
+
+Un renvoi inaccessible n'est donc pas un lien mort : c'est une source nommée pour qu'on puisse la
+demander, la retrouver ailleurs, ou refaire la mesure.
+
 ## Principe de non-duplication
 
 Ce référentiel **synthétise et traduit** plutôt que de dupliquer intégralement les tables déjà exhaustives présentes dans le projet (notamment `SC62015Disassembler/Docs/Doc technique/README - PC-E500 Instruction Table.md`, 417 lignes anglaises, et `Data/OpcodeTable.json`, 256 entrées). Chaque fichier renvoie explicitement vers ces sources pour le détail octet-par-octet (encodage exact, cycles) plutôt que de le recopier une seconde fois. La valeur ajoutée est : la synthèse en français, la mise en cohérence entre sources parfois divergentes, le comblement de lacunes identifiées (fonctions FCS manquantes, carte mémoire mise en forme, sources internationales), et la cartographie de l'ensemble.
