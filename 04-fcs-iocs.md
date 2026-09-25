@@ -1,5 +1,7 @@
 # FCS et IOCS — appels système du PC-E500S
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
 Le PC-E500S offre trois niveaux d'entrée/sortie, du plus haut niveau (portable, simple) au plus bas (rapide, dépendant du matériel) :
@@ -109,6 +111,13 @@ releve sur un PC-E500S reel (s1-1.bin) -- handle 0 en 0BEE48h :  00 00 E7 21 0F 
 ### 2.1 Structure d'un en-tête de driver
 
 Chaque driver installé publie un en-tête (chaîné, voir `03-memoire-et-systeme-pc-e500s.md` §7) :
+
+> 📖 **Ce format n'est pas qu'une structure du manuel : c'est une norme de fait, et elle a une
+> source datée.** La notice du pilote `EXTSLOT` déclare se conformer aux règles de pilotes de
+> périphériques décrites dans l'article **« Pocket Link » de M. Chikashige, *Pocket Computer
+> Journal*, juin 1990** (`07` §3bis) — soit deux ans avant les pilotes que le corpus conserve. Le
+> nom de cet article et celui de `PLINKC`, « Pocket Link Cache » (1999, `06`), se ressemblent ;
+> aucune source du corpus ne les relie, et le second est de langue allemande.
 
 | Décalage | Champ | Contenu |
 |---|---|---|

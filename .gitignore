@@ -4,3 +4,24 @@
 # Bruit Windows
 Thumbs.db
 desktop.ini
+
+# ----------------------------------------------------------------------------
+# Contenu tiers : present en local, JAMAIS publie (voir NOTICE.md)
+# ----------------------------------------------------------------------------
+
+# Manuels Sharp (CE-140F : utilisation, service, emulateur)
+Manuels CE-140F/
+
+# Photos : cliches de l'auteur ET images d'annonces de vente, notice fabricant
+Photos Carte memoire Sharp/
+Photos carte mère Sharp/
+
+# Corpus d'archives japonaises 1992-1996 et leurs traductions (07 §3bis)
+Delta350/
+EXTSLOT/
+INST105/
+Zou/
+contenu_delta/
+contenu_diskuty/
+contenu_knjsc/
+contenu_others/

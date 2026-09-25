@@ -1,6 +1,6 @@
 # Mémoire et système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-24*
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier détaille la carte mémoire du PC-E500S (interne + externe), les registres d'E/S, les vecteurs d'interruption et les points d'entrée IOCS. Sources principales : le manuel *ESR-L CPU Instruction Manual*, le *Technical Reference Manual PC-E500*, et la feuille de dépouillement `Docs/Doc technique/PCE500 Description mémoire.xls.xlsx` déjà constituée dans le projet `SC62015Disassembler` (adresses recoupées avec des listings XASM réels).
 
@@ -237,6 +237,38 @@ La chaîne est jointive et se termine en `0BDA1Ah`, contre `[s1_btm]` − 1. Ce 
 1. ✅ **`DATA.BAS` est le premier bloc et contient toute la mémoire libre.** Il n'y a pas de place « après la chaîne » : elle est **dans** `DATA.BAS`, et `TXTBAS`/`DATBAS` (§3) désignent ces deux blocs.
 2. ⛔ **Un bloc ajouté en fin de chaîne bouge.** Au premier besoin de place du BASIC, `DATA.BAS` regrossit et **pousse vers le haut** tout ce qui le suit ; le bloc est déplacé **sans relocation**, et les pointeurs extérieurs (maillon IOCS, crochets du BASIC) désignent l'ancienne adresse. Mesuré : bloc copié en `0804E5h`, relu en `0BCF30h` au `RUN` suivant ; la ligne tapée ensuite a arrêté PockEmul (FACTORY RESET). C'est ce que faisait le `DRIVER_TEMPLATE` de `xasm2026-4`, validé seulement jusqu'à « apparaît dans `FILES` ».
 3. ✅ **Le modèle qui tient est celui de `PLINKC` 1.62**, validé sur matériel : compacter (IOCS device 6, `47h`), insérer **avant le premier bloc qui n'est pas un pilote** (donc avant `DATA.BAS`), décaler les blocs suivants vers le haut, puis **recaler `TXTBAS`/`DATBAS`** (`linkbas` : IOCS `41h` sur les noms rangés en `[baswrk]+72h`/`+7Eh`) — sur **tous** les chemins qui suivent le compactage, erreurs comprises. Mesuré avec `BASEXT-DRV` 0.2 : bloc en `080018h`, **immobile** après une ligne tapée, `DATA.BAS` et `TEXT.BAS` regrossissant derrière lui.
+
+📖 **La ROM sait elle-même créer un bloc en tête** : la commande IOCS `48h` du device 6,
+`block_create_top`, « création d'un bloc mémoire **en tête** des blocs, propre au PC-E500 »
+(`Data/FCSFunctions.json` ; `(ch)` = lecteur, `X` = nom, `Y` = taille). Nos installateurs
+n'en usent pas — ils compactent par `47h` puis insèrent à la main —, et un pilote d'époque,
+`EXTSLOT`, **étend** cette commande plutôt que de la contourner (`07` §3bis). **Piste à
+mesurer** : `48h` rend-elle inutile le décalage manuel des blocs du §7bis point 3 ?
+
+### Trois façons de reloger un pilote — dont une d'époque
+
+Un bloc copié à une adresse choisie à l'installation doit voir ses adresses absolues corrigées.
+Trois modèles existent, et le troisième est le plus surprenant :
+
+| Modèle | Comment | Où |
+|---|---|---|
+| **Table mesurée** | double assemblage à deux origines, chaque octet qui change est rangé dans un champ de 2 ou 3 octets, table émise au format Kon et vérifiée à une troisième origine | `BASEXT-DRV/outils/reloc.py` ✅ |
+| **Table déclarée** | préfixe `rel` devant chaque instruction à reloger ; l'assembleur émet la table après le code | A62 (N. Kon), `PLINKC`, `xasm2026-4` (`05` §7bis) ✅ |
+| **Analyse du programme** | **aucune table** : l'installateur *analyse* le code et reconnaît lui-même les adresses à corriger | `INSTd`/`INSTt` 1.05 (TORO, 1994) 📖 |
+
+📖 Le troisième impose des règles à la source, que sa notice énonce (`07` §3bis) et qui disent
+bien ce qu'une analyse peut et ne peut pas faire :
+
+- **code et données séparés** — le code avant `@@PEND`, les données entre `@@PEND` et `@@DEND` ;
+- **aucune valeur de 3 octets en `0Exxxxh`** : elle serait prise pour une adresse du programme
+  (écrire `1Exxxxh`). C'est le revers de la convention d'assemblage de cette famille, qui donne
+  aux labels une adresse **logique** en `0E0000h` (`ORG 0E0000H,adresse physique`, `05` §7ter) ;
+- **aucune référence d'adresse par table** (`JP [X]`) : seul le programme est relogé, pas les
+  données ;
+- une **somme de contrôle** à calculer en exécutant le programme une fois après l'assemblage.
+
+Il installe sur `S1:` **ou `S2:`** et cherche un numéro de device IOCS libre — la même conduite
+que PLINKC. ⚠️ Rien de tout cela n'a été assemblé ni mesuré ici.
 
 Autres faits mesurés au passage :
 

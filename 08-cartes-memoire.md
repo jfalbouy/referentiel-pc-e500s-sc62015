@@ -49,7 +49,7 @@ Caractéristiques communes : alimentation 3 V (batteries de l'appareil quand la 
 
 Au-delà de 64 Ko, Sharp n'a pas documenté de carte demi-format officielle dans cette gamme numérotée ; la spécification d'Andrew Woods (1995) mentionne toutefois une variante 128 Ko en option pour le PC-E500, sans référence commerciale précise. Le PC-E500S annonce officiellement jusqu'à **256 Ko** pour sa carte (Arno Welzel, Wikipedia) — c'est-à-dire l'emplacement **`S2:`** : ⛔ une version antérieure écrivait `S1`, qui est la RAM interne (§1bis) : au-delà de 64 Ko documenté par la gamme CE-2Hxx, **le marché s'est donc reporté sur des cartes tierces** — objet du §3.
 
-## 3. Cartes tierces documentées (photos utilisateur, `Photos Carte memoire Sharp/`)
+## 3. Cartes tierces documentées (photos utilisateur, dossier local `Photos Carte memoire Sharp/`)
 
 Cinq cartes distinctes ont été photographiées et démontées. Elles illustrent la progression technique nécessaire pour dépasser la limite officielle de 64 Ko : simple puce unique (128 Ko), deux puces + décodeur avec protection matérielle (256 Ko, chez **trois fabricants indépendants**, tous basés à Aix-la-Chapelle/Aachen), puis deux puces + décodeur avec commutation de banque logicielle (1024 Ko).
 
@@ -215,4 +215,4 @@ Comme indiqué en préambule, plusieurs points mériteraient d'être confirmés 
 - `03-memoire-et-systeme-pc-e500s.md` §1bis-1ter, §4-5 — carte mémoire externe précise par ligne `CE`, tables système des emplacements de carte (`ldAdSlot`/`cpSlot`), modes `MEM$`.
 - `09-cartes-meres-ram-interne.md` — carte mère 32 Ko vs 256 Ko, confirmation communautaire (forum silicium.org) du schéma 2×128 Ko et des limites réelles observées.
 - `07-sources-et-bibliographie.md` — sources générales (Arno Welzel, sharppocketcomputers.com, spécification CPU d'Andrew Woods).
-- Dossier `Photos Carte memoire Sharp/` — photos sources de ce fichier. Les deux photos de la carte M. Kemper 256 Ko ont été reçues au format HEIC (conservées sous `531135.heic`/`594245.heic`) et converties en `531135.jpg`/`594245.jpg` pour une lecture directe. Les photos `berlin1.jpg`/`berlin2.jpg` (carte Böttcher/M.K. v4.1, §3.4) et `s-l1600.png`/`s-l1601.png` (carte Becker & Partner, §3.5) ont été ajoutées ultérieurement.
+- Dossier `Photos Carte memoire Sharp/` — photos sources de ce fichier, **conservées hors du dépôt** (`NOTICE.md`). Les deux photos de la carte M. Kemper 256 Ko ont été reçues au format HEIC (conservées sous `531135.heic`/`594245.heic`) et converties en `531135.jpg`/`594245.jpg` pour une lecture directe. Les photos `berlin1.jpg`/`berlin2.jpg` (carte Böttcher/M.K. v4.1, §3.4) et `s-l1600.png`/`s-l1601.png` (carte Becker & Partner, §3.5) ont été ajoutées ultérieurement.

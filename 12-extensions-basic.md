@@ -1,6 +1,6 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
-*Rédigé le 2026-09-03 — mis à jour le 2026-09-24*
+*Rédigé le 2026-09-03 — mis à jour le 2026-09-25*
 
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
@@ -1093,7 +1093,7 @@ l'installation coûte une table de sites et une boucle de six lignes.
 
 ## 18. Sources
 
-- **`Nx commandes BASIC.docx`** — SynologyDrive, `Sharp PC E500S\01- Manuels et Guides\01- Basic\`. Traduction française d'un document allemand. **Dix-sept lignes qui spécifient le mécanisme** : les deux crochets, le format des deux listes, les bits 7 et 6, l'obligation de `RETF`, la retenue comme statut d'erreur, `(BP+0)` comme statut BASIC, et `X` comme pointeur de programme en entrée/sortie. C'est la source de référence ; tout le reste de ce document la complète par la lecture de la ROM et la mesure.
+- **`Nx commandes BASIC.docx`** — archive personnelle de J.-F. Albouy, hors dépôt. Traduction française d'un document allemand. **Dix-sept lignes qui spécifient le mécanisme** : les deux crochets, le format des deux listes, les bits 7 et 6, l'obligation de `RETF`, la retenue comme statut d'erreur, `(BP+0)` comme statut BASIC, et `X` comme pointeur de programme en entrée/sortie. C'est la source de référence ; tout le reste de ce document la complète par la lecture de la ROM et la mesure.
 - **`PC-E500 systemhandbuch.pdf`** et sa traduction `Systemhandbuch_PC-E500_traduction_FR.docx` (`Sharp Basic Converter/Documentation/`) — le préfixe `0FEH` des tokens, et une troisième confirmation de la doctrine PRE (*« Die übliche Adressierungsart ist (BP+n), sie erfordert keinen [PRE] »*).
 - **`BASCOM`** (TORO, 1994) — `SC62015Disassembler/Samples/BASCOM/`. Seul exemple du corpus, et seul témoin de l'installation : douze mots-clés, mais **trois routines seulement**, toutes des instructions.
 - **Rétro-ingénierie de `rom83.bin`** — les résolveurs `F58E5H` et `F590BH`, la recherche `F593DH`, le tokeniseur `F4413H`/`F448BH`, le gabarit `BAS_PEEK` (`F9F44H`) et les trois services de conversion. Détail dans `SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`.

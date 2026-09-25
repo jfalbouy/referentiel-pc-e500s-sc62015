@@ -1,5 +1,7 @@
 # Cartes mère — RAM interne 32 Ko vs 256 Ko
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier documente les deux cartes mère photographiées dans `Photos carte mère Sharp/` (« Sharp 32K » et « Sharp 256K »), pour comprendre comment Sharp a physiquement implémenté les deux configurations de RAM interne, en complément de `08-cartes-memoire.md` (cartes mémoire amovibles).
 
 ## 1. Carte mère « 32 Ko » (configuration standard)
@@ -42,6 +44,11 @@ Deux hypothèses, non tranchées par les seules photos :
 
 **Ces deux hypothèses ne s'excluent pas** : Sharp a bien commercialisé une variante 256 Ko d'origine (§4), ce qui rend une modification artisanale plausible et techniquement réalisable en s'inspirant du même schéma (2 puces 128 Ko + câblage des lignes d'adresse supplémentaires) sur une carte 32 Ko de base.
 
+📖 **La seconde hypothèse n'est plus une conjecture** : une source d'époque documente la
+modification pas à pas, brochages et schémas compris, et va jusqu'à 1 Mio interne (§4bis). Des fils
+soudés à la main sur les broches des RAM sont donc la signature d'une pratique courante, et non
+l'indice d'un bricolage isolé.
+
 ## 4. Confirmation communautaire (forum silicium.org, 2015)
 
 Fil « **PC-E500S 256K** » (`forum.silicium.org/viewtopic.php?t=39164`, juillet 2015) — témoignage détaillé et directement exploitable :
@@ -58,6 +65,42 @@ Fil « **PC-E500S 256K** » (`forum.silicium.org/viewtopic.php?t=39164`, juillet
   - Carte 256 Ko dans le slot `S1:` d'un **PC-1360** → non reconnue (`*`). Expliqué par un intervenant (Rom1500, spécialiste des cartes PC-1500/1600) : la carte utilise les lignes d'adresse **`A15`, `A16`, `A17`** sans résistances de tirage (*pull-up*) intégrées à la carte elle-même — ces lignes sont non connectées (`NC`) sur le PC-1360, qui ne peut donc pas les lire correctement. **Ceci confirme qu'au moins `A15`-`A17` sont disponibles sur le connecteur de carte**, et que les cartes de grande capacité s'appuient sur ces lignes hautes pour sélectionner leur banc — cohérent avec l'analyse de `08-cartes-memoire.md` §1/§3.
 - La carte mémoire externe par ligne `CE` citée par un intervenant (reproduite en `03-memoire-et-systeme-pc-e500s.md` §1bis) provient de ce fil.
 
+## 4bis. Une source d'époque : le « Guide de modification de la série E500 » (1996)
+
+*`Zou/Guide_modification_serie_E500_2e_edition_FR.md` — 2ᵉ édition, 1996, « #4041 Lycanthrophy
+nomi », traduit du japonais le 2026-09-10. Corpus local, hors dépôt (`07` §3bis). 📖 **Lu, non
+éprouvé** : rien n'a été soudé ni mesuré ici.*
+
+Ce document tranche la question laissée ouverte au §3 : **la modification artisanale de la RAM
+interne était une pratique documentée**, avec son guide, ses brochages et ses schémas. Il donne :
+
+- les **brochages** des trois SRAM qui comptent pour ces machines : `HM62256` (32 Kio, 28 broches),
+  `HM628128` (128 Kio, 32 broches), `HM628512` (512 Kio, 32 broches) — la deuxième est exactement
+  la classe de puce observée sur la carte mère 256 Ko du §2 (`V62C5181024L`, `CXK581000AM`) ;
+- le **brochage du CPU**, 100 broches, avec ses groupes (données, adresses, entrées clavier, port E,
+  horloge) ;
+- les circuits de décodage employés (`74HC00`, `74HC02`, `74HC138`, `74HC139`, `74HC157`,
+  `74HC158`/`74HC258`) et les précautions de dessoudage/empilage ;
+- un **schéma complet** portant la RAM interne d'un E500/E550 à **1 Mio** avec deux puces de
+  4 Mbit, réparti en `S1:` 256 Kio + `S2:` 256 Kio + **`D:` 512 Kio**.
+
+Quatre points valent d'être retenus, parce qu'ils ne se déduisent pas des photos :
+
+1. **`D:` n'est pas un lecteur de la ROM** : c'est le disque RAM du pilote **DELTA** (version 3.4 ou
+   3.5, `07` §3bis), « comparable à une extension EMS ». La capacité de 512 Kio n'existe donc que
+   par un pilote résident, et suppose la mémoire **bancaire** que le schéma câble.
+2. **`S2:` devient interne** : la modification intègre les 256 Kio de la carte, ce qui rend la carte
+   amovible inutile et **libère le connecteur** pour autre chose (l'auteur cite un disque dur).
+3. ⛔ **La modification ne s'applique pas au E650** : sa zone ROM, plus grande, entre en conflit avec
+   la zone employée par DELTA. Une limite d'implantation mémoire, pas de soudure.
+4. Sur **E500** les deux puces doivent être **empilées** ; sur **E550** elles tiennent côte à côte.
+
+Le schéma est repris de deux articles de la même communauté, cités par leur numéro, leur date et
+leur taille : **Daris**, « DELTA avec une RAM 4 Mbits ! » (1995-09-21) et **ganze**, « RAM 4 Mbits
+`S1:`256 `D:`256 ou `S2:`256 interne » (1996-02-26) — ce dernier permettant de **choisir** entre
+`S2:` et `D:` pour la seconde moitié. L'existence de ces articles donne une piste de recherche
+précise, et une datation : la pratique était établie dès 1995.
+
 ## 5. Conséquences pour un projet de carte mémoire (256/512/1024 Ko)
 
 1. **Le schéma « 2 puces 128 Ko » observé ici pour la RAM interne 256 Ko est distinct de celui des cartes amovibles** (`08-cartes-memoire.md`) mais partage le même principe : combiner deux puces standard plutôt que chercher une puce unique de grande capacité — argument supplémentaire en faveur de l'approche « 2× FRAM 128 Ko + décodeur » proposée pour une carte FRAM 256 Ko amovible.
@@ -68,5 +111,5 @@ Fil « **PC-E500S 256K** » (`forum.silicium.org/viewtopic.php?t=39164`, juillet
 
 - `03-memoire-et-systeme-pc-e500s.md` §1bis-1ter — carte mémoire externe complète par ligne `CE`, fenêtre de RAM interne par modèle.
 - `08-cartes-memoire.md` — cartes mémoire amovibles (SRAM/FRAM), même logique de décodage par puces combinées.
-- `07-sources-et-bibliographie.md` — détail de la source forum silicium.org.
-- Dossier `Photos carte mère Sharp/` — photos sources de ce fichier.
+- `07-sources-et-bibliographie.md` — détail de la source forum silicium.org, et §3bis pour le corpus japonais dont vient le guide du §4bis.
+- Dossier `Photos carte mère Sharp/` — photos sources de ce fichier, **conservées hors du dépôt** (`NOTICE.md`).

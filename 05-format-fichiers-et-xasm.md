@@ -1,6 +1,6 @@
 # Formats de fichiers et assembleur XASM
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-24*
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
 
 > Voir `00-index.md` pour la vue d'ensemble. Synthèse de `SC62015Disassembler/Docs/Doc technique/Documentation_XASM_PC-E500S.md` (déjà très complet) et du `README.md`/`CLAUDE.md` de `SC62015Disassembler` pour le point de vue « lecture » des mêmes formats.
 
@@ -176,6 +176,29 @@ FF 00 06 01 10 61 38 00 00 98 0B FF FF FF 00 0F
 
 **Point de vigilance vérifié sur fichiers réels** (`register.obj`/`tmap.obj`/`vogue.obj`) : le champ *exec address* (décalage `0x0B`, 3 octets) vaut en pratique `FF FF FF` — une sentinelle « pas de point d'entrée distinct de l'adresse de chargement » plutôt qu'une adresse réelle — et le champ *reserved* (décalage `0x0E`) vaut `00 0F`. Un lecteur qui validerait strictement `exec ≤ 0xFFFFF` rejetterait donc les objets XASM réels ; il faut traiter `0xFFFFFF` comme cas spécial (`EntryPoint = load_addr`).
 
+### 5.1bis L'enveloppe texte — **quatre** formes, pas une
+
+> **Référent : `C:\Claude\UUENCODE-UUDECODE\FORMATS.md`** (comparaison structure par structure,
+> sommes de contrôle comprises). Ce paragraphe n'en donne que la clé de lecture.
+
+⛔ **Deux fichiers portant tous deux l'extension `.UUE` peuvent ne pas avoir la même structure**,
+selon qu'ils viennent du PC ou de la machine. C'est la source d'erreur principale du transport
+d'objets. Les quatre formes partagent le **même alphabet uuencode** ; ce qui les sépare est la
+nature du fichier et le contrôle d'intégrité :
+
+| Forme | Produite par | Signe distinctif | Nature |
+|---|---|---|---|
+| `.UUE` **du PC** | `UUENCODE.EXE` 5.25 (R. Marks, 1993), ou sa réécriture C17 | en-tête `section 1 of…`, deux lignes `sum -r/size` (somme tournante BSD 16 bits), `1Ah` final en MS-DOS | fichier texte d'**échange** |
+| `.UUE` **du Sharp** | `UUENC3.ASM` sur la machine | **une somme de contrôle par ligne** (6 bits), fin `end` + `size n` | fichier texte d'échange |
+| `.uu` | `xasm2026-4 -B` | le précédent, chaque ligne préfixée `NNNN '`, précédé d'une **amorce BASIC** de 39 lignes | **programme BASIC exécutable** qui se décode lui-même : format de **déploiement** |
+| `.uux` | `uuencode -b` (PC) ou `UUENC3 -B` (Sharp) | le `.uu` **sans** son amorce : inerte | bloc destiné au `MERGE` |
+
+✅ **Mesuré le 2026-09-23** (`C:\Claude\UUENCODE-UUDECODE`, 26 essais) : la réécriture C17 des deux
+outils de 1993 encode **à l'octet près** comme les binaires MS-DOS d'époque ; le `.uux` produit sur
+PC par `uuencode -b` est **identique octet pour octet** à celui produit par `UUENC3 -B` **sur un
+PC-E500S réel** ; et le bloc de données d'un `.uu` de `xasm2026-4 -B` est ce même `.uux`. Le dump
+ROM `rom83_x.uue` (262 144 octets) se décode conforme à sa somme `#META`.
+
 ### 5.2 Lecture (désassembleur) — formats reconnus
 
 Le désassembleur du projet (`SC62015Disassembler`) reconnaît en entrée un sur-ensemble de formats rencontrés dans l'écosystème PC-E500.
@@ -242,7 +265,7 @@ a demandé, et qui vaut pour toute source de cette famille :
 
 | Original | `xasm2026-4` | Pourquoi |
 |---|---|---|
-| `ORG 0E0000H,0BE300H` (adresse logique, adresse physique) | `org 0BE300h` puis `phase 0E0000h` … `dephase` | les labels à l'adresse logique, les octets à leur place |
+| `ORG 0E0000H,0BE300H` (adresse logique, adresse physique) | `org 0BE300h` puis `phase 0E0000h` … `dephase` | les labels à l'adresse logique, les octets à leur place. 📖 **C'est la convention de toute cette famille de sources** : l'installateur `INSTd` 1.05 écrit de même `ORG 0E0000H,0BC340H`, et sa relocation *par analyse* repose précisément sur cette base `0E0000h` — d'où son interdiction d'écrire une valeur de 3 octets en `0Exxxxh` (`03` §7bis) |
 | un `ORG` qui **revient en arrière** (TSR en `0BE300h`, puis installateur en `0BE000h`) | **remettre les segments dans l'ordre croissant**, combler par `ds cible-*,0` | ⛔ `xasm2026-4` **concatène** les segments dans l'ordre du source et prend l'adresse la plus basse pour l'en-tête : l'objet sort **faux, sans aucun message** (mesuré le 2026-09-24) |
 | `PRE 30H MV Y,[(BASWRK)+0BH]` sur une ligne | `pre 30h` sur sa propre ligne, **sans** `pre_on` | les accès `(n)` sans PRE de l'original sont voulus : ce sont des `(BP+n)` |
 | `HISIZE EQU 110H` | `hisize: equ 110h` | le `:` est obligatoire, même devant `EQU` (§2) |
