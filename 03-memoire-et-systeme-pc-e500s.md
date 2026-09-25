@@ -269,7 +269,24 @@ insuffisante ».
   gabarit écrit une taille de `22h` avec l'attribut `20h`. 📖 `48h` créerait donc un bloc **vide**,
   la taille venant ensuite de `42h` `block_resize` (`(ch)`, `a` = 0/1, `X` = nom, `Y` = taille ;
   rend `Y` = taille possible). La voie ROM complète serait `47h` → `48h` → `42h`, plus la pose de
-  l'attribut. **Non mesurée** : l'installateur ne bouge pas tant qu'elle ne l'est pas.
+  l'attribut.
+
+✅ **Seconde mesure, PC-E500S réel, 2026-09-25 : la voie ROM complète PASSE.** Sonde `T482`
+(`47h` → `48h` → `42h`, chaque commande suivie de `linkbas`, le tout dans un seul `CALL`) :
+
+| Ce qui est mesuré | Valeur |
+|---|---|
+| la séquence entière | **réussie**, aucune commande n'a refusé |
+| `48h` | crée le bloc **en tête**, en `080018h` — l'ancienne adresse de `DATA.BAS`, les blocs suivants montés |
+| `42h` | accorde **2839 octets d'un coup** et **ne déplace pas** le bloc (`41h` le relit en `080018h`) |
+| bloc obtenu | **2873 octets = 2839 + `22h`**, attribut **`20h`** — celui du gabarit de la ROM |
+| `47h` | rend vraiment la place : `DATA.BAS` retombe de 251 962 à **420** octets, sa taille réelle |
+
+**La ROM sait donc faire l'insertion qu'un installateur fait à la main.** Ce qui reste à trancher
+avant d'en changer un : ⚠️ lequel de `48h` ou de `42h` donne sa taille au bloc (les deux lectures
+tiennent encore), et ⚠️ pourquoi `(txtbas)` est resté **périmé** après la séquence alors que
+`(datbas)` était juste — c'est précisément le geste dont dépend un installateur. Détail, relevés et
+sondes : `C:\Claude\BASEXT-DRV\sondes\README.md`.
 
 ### Trois façons de reloger un pilote — dont une d'époque
 
