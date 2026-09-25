@@ -1,5 +1,7 @@
 # Jeu d'instructions du SC62015 (ESR-L)
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-14*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier synthétise en français le jeu d'instructions ; **pour l'encodage exact octet par octet, les cycles et les tailles, la référence détaillée reste** `SC62015Disassembler/Docs/Doc technique/README - PC-E500 Instruction Table.md` (anglais, exhaustif, table par table) **et** `SC62015Disassembler/Data/OpcodeTable.json` (256 entrées machine-readable, utilisées par le désassembleur du projet). Ce référentiel évite de dupliquer ces 256 lignes octet-par-octet et se concentre sur une vue d'ensemble et un sommaire par mnémonique.
 
 ## 1. Notation

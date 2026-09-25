@@ -1,5 +1,7 @@
 # Proposition de fabrication — carte FRAM 256 Ko
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-08-26*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier reprend, pour une carte **256 Ko**, le même exercice que `10-fabrication-carte-1024ko-fram.md` : nomenclature chiffrée, schéma fonctionnel, proposition de PCB — pour une conception équivalente à la **carte FRAM commerciale japonaise** décrite en `08-cartes-memoire.md` §4 (vendeur 高松製作所/Takamatsu Seisakusho, `tmfg.jp`).
 >
 > **Avertissement identique à `10-fabrication-carte-1024ko-fram.md`** : le brochage exact du connecteur reste non confirmé publiquement — hypothèse de conception à vérifier par traçage de continuité avant routage définitif (`08-cartes-memoire.md` §6).

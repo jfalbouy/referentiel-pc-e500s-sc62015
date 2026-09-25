@@ -1,5 +1,7 @@
 # Proposition de fabrication — carte FRAM 1024 Ko
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-08-26*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier propose une **conception nouvelle** (pas une reconstitution exacte de la carte M. Kemper/Dynatech de `08-cartes-memoire.md` §3.3) : un nomenclature (BOM) chiffrée et un schéma fonctionnel pour une carte 1024 Ko en FRAM (sans pile), en s'appuyant sur le fonctionnement confirmé du registre `POKE 65536` (§3.3) et les contraintes de bus du SC62015 (`01-architecture-cpu-sc62015.md` §3, `08-cartes-memoire.md` §1).
 >
 > **Avertissement** : comme indiqué dans `08-cartes-memoire.md` (préambule et §6), le brochage exact du connecteur de carte Sharp n'est publié nulle part et n'a pas été retrouvé lors des recherches (y compris recherche web dédiée, juillet 2026). Tout ce fichier repose donc sur une hypothèse de fonctionnement (le connecteur expose le bus d'adresse/données/contrôle du SC62015 de façon suffisamment directe pour permettre le décodage embarqué décrit ci-dessous) qui **doit être vérifiée par traçage de continuité** sur une carte réelle avant de router un PCB définitif.

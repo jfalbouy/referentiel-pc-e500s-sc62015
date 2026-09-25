@@ -1,5 +1,7 @@
 # Architecture du CPU SC62015 (ESR-L)
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-14*
+
 > Fichier du référentiel PC-E500S / SC62015. Voir `00-index.md` pour la vue d'ensemble et la liste des sources.
 
 ## 1. Identité du CPU

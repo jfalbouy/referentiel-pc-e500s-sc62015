@@ -1,5 +1,7 @@
 # Cartes mémoire — officielles, tierces, et pistes FRAM
 
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier documente les cartes mémoire connues pour PC-E500/PC-E500S (Sharp et tierces), avec un inventaire technique des **cinq cartes tierces** photographiées dans `Photos Carte memoire Sharp/` (128 Ko, 256 Ko ×3 fabricants indépendants, 1024 Ko), dans le but de préparer la fabrication de nouvelles cartes 256 Ko / 512 Ko / 1024 Ko, si possible en FRAM.
 >
 > **Avertissement méthodologique** : au-delà de ce qui est directement lisible sur les cartes (marquages de composants) ou documenté dans un manuel Sharp, plusieurs points ci-dessous (mécanisme exact de bascule de banque, brochage complet du connecteur) restent des **hypothèses techniques argumentées**, pas des certitudes — ce référentiel n'a pas trouvé de brochage connecteur ni de schéma Sharp publiés. Ces points sont marqués « **à vérifier avant fabrication** » et la vérification recommandée (traçage de continuité sur une carte réelle possédée par l'utilisateur) est indiquée.
