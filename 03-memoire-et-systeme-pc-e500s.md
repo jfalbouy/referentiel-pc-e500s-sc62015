@@ -221,7 +221,7 @@ Ce format d'en-tête chaîné (adresse du suivant sur 3 octets + identifiant + a
 
 ## 7bis. La chaîne des blocs de `S1:` — où loger un pilote résident
 
-Un pilote résident vit dans un **bloc** de `S1:` (en-tête `0FBh` + nom 8.3 ; attribut relevé `25h` pour `BASEXT.SYS`, `20h` pour les blocs du BASIC — un pilote se reconnaît aux bits `0Ch`, test de PLINKC), protégé comme un fichier, et publie son en-tête IOCS dans la chaîne du §7. **Où** l'insérer dans la chaîne des blocs n'est pas un détail : c'est ce qui décide s'il bougera. Mesuré sur émulateur PC-E500S par J.-F. Albouy le 2026-09-16 (`C:\Claude\BASEXT-DRV\essais\BLOCS.BAS`, `PEEK` seulement ; `CONCEPTION.md` §5bis et §5ter).
+Un pilote résident vit dans un **bloc** de `S1:` (en-tête `0FBh` + nom 8.3 ; attribut relevé `25h` pour `BASEXT.SYS`, `20h` pour les blocs du BASIC — l'**attribut** est en `+0Ch`, et PLINKC y reconnaît un pilote par `mv a,[x+0Ch]` / `test a,00Ch`), protégé comme un fichier, et publie son en-tête IOCS dans la chaîne du §7. **Où** l'insérer dans la chaîne des blocs n'est pas un détail : c'est ce qui décide s'il bougera. Mesuré sur émulateur PC-E500S par J.-F. Albouy le 2026-09-16 (`C:\Claude\BASEXT-DRV\essais\BLOCS.BAS`, `PEEK` seulement ; `CONCEPTION.md` §5bis et §5ter).
 
 ✅ **Après un RESET complet, sans pilote** :
 
@@ -243,7 +243,14 @@ La chaîne est jointive et se termine en `0BDA1Ah`, contre `[s1_btm]` − 1. Ce 
 (`Data/FCSFunctions.json` ; `(ch)` = lecteur, `X` = nom, `Y` = taille). Nos installateurs
 n'en usent pas — ils compactent par `47h` puis insèrent à la main —, et un pilote d'époque,
 `EXTSLOT`, **étend** cette commande plutôt que de la contourner (`07` §3bis). **Piste à
-mesurer** : `48h` rend-elle inutile le décalage manuel des blocs du §7bis point 3 ?
+mesurer** : `48h` rend-elle inutile le décalage manuel des blocs du point 3 ? 📖 La lecture du
+traitement (`0F034Bh`) va dans ce sens — il contrôle la place, refuse un nom déjà pris (`41h`),
+**efface le bit du lecteur** dans `[(iocsw)+3Ah]` (`0F0330h` ; c'est l'octet que l'installateur de
+`BASEXT-DRV` remet à zéro) puis **déplace la mémoire** par la commande `43h` `block_transfer`, avant
+de copier un gabarit d'en-tête de `22h` octets. La commande `45h` est la même routine **sans** le
+déplacement. Ce qui reste à voir est s'il recale `TXTBAS`/`DATBAS` ou s'il compte sur le drapeau
+pour les faire retrouver plus tard : sonde et protocole prêts dans
+`C:\Claude\BASEXT-DRV\sondes\` (`T48.ASM`, `T48.BAS`, `README.md`).
 
 ### Trois façons de reloger un pilote — dont une d'époque
 

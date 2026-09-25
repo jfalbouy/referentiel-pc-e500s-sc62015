@@ -99,6 +99,13 @@ fichiers `*_traduction_francaise.md`/`.docx` sont les traductions de 2026.
 référentiel : les faits qui en sont tirés sont marqués 📖 (lus dans une notice), jamais ✅. Les
 sources en Shift-JIS n'ont pas été relues ligne à ligne.
 
+- **`PLINKC` 1.62 — la source A62 nomme deux auteurs.** ✅ Relevé dans l'en-tête de
+  `xasm2026-4/Exemples/PLINKC/A62/plinkc.a62.asm` : « *Pocket Link Cache Device Driver ver 1.62 /
+  Installation program / Copyright (c) 1996,1997,1999 by **Daisuke Mizobata** / based on PLINK.SYS
+  ver 1.04 / Copyright (c) 1990,93,94 **N.Kon** ». L'installateur dont `BASEXT-DRV` reprend le
+  modèle est donc de Mizobata ; le pilote d'origine, de N. Kon — le même que XASM 1.0. C'est aussi
+  cette source qui donne le test « ce bloc est-il un pilote ? » : attribut en `+0Ch`, `test a,00Ch`.
+
 ## 4. Sources communautaires — Allemagne
 
 - **[Arno Welzel](https://arnowelzel.de/en/projects/technology-museum/pocket-computers/sharp-pc-e500s)** — fiche technique et d'usage détaillée du PC-E500S (specs, cartes mémoire, modes `S1`/`S2`/`B` via `MEM$`, cartes FRAM modernes, interfaces série et adaptateur USB) — source de `03-memoire-et-systeme-pc-e500s.md` §5.
