@@ -248,9 +248,28 @@ traitement (`0F034Bh`) va dans ce sens — il contrôle la place, refuse un nom 
 **efface le bit du lecteur** dans `[(iocsw)+3Ah]` (`0F0330h` ; c'est l'octet que l'installateur de
 `BASEXT-DRV` remet à zéro) puis **déplace la mémoire** par la commande `43h` `block_transfer`, avant
 de copier un gabarit d'en-tête de `22h` octets. La commande `45h` est la même routine **sans** le
-déplacement. Ce qui reste à voir est s'il recale `TXTBAS`/`DATBAS` ou s'il compte sur le drapeau
-pour les faire retrouver plus tard : sonde et protocole prêts dans
+déplacement. Sonde, protocole et relevés :
 `C:\Claude\BASEXT-DRV\sondes\` (`T48.ASM`, `T48.BAS`, `README.md`).
+
+✅ **Première mesure, PC-E500S réel, 2026-09-25 (J.-F. Albouy) : `48h` REFUSE, erreur `0Ch`, et ne
+touche à rien.** Chaîne, `TXTBAS`/`DATBAS` et `[(iocsw)+3Ah]` identiques avant et après. La ROM
+explique le refus : le traitement appelle d'abord `SUB_F0244`, qui rend dans `Y` **l'espace libre
+après la chaîne**, puis fait `sub y,22h` et part en erreur `0Ch` si la soustraction emprunte. Or
+`S1BTM` − `FIN` valait **1 octet** — la chaîne est jointive, et c'est le cas normal (point 1
+ci-dessus). Le carnet confirme le sens du code : pour la commande voisine `45h`, « `00Ch` mémoire
+insuffisante ».
+
+**Ce que cela apprend :**
+
+- ✅ **`47h` `condense` avant `48h` n'est pas une précaution, c'est une condition.** L'installateur
+  de `BASEXT-DRV` compacte déjà en premier ; la mesure lui donne raison.
+- ✅ Un refus de `48h` est **sans effet de bord** : la commande vérifie avant d'agir.
+- ⚠️ **Le carnet prête à `48h` un paramètre que la ROM n'emploie pas.** Il annonce « `Y` = taille » ;
+  `Y` est écrasé dès la deuxième instruction, la chaîne n'est décalée que de `22h` octets, et le
+  gabarit écrit une taille de `22h` avec l'attribut `20h`. 📖 `48h` créerait donc un bloc **vide**,
+  la taille venant ensuite de `42h` `block_resize` (`(ch)`, `a` = 0/1, `X` = nom, `Y` = taille ;
+  rend `Y` = taille possible). La voie ROM complète serait `47h` → `48h` → `42h`, plus la pose de
+  l'attribut. **Non mesurée** : l'installateur ne bouge pas tant qu'elle ne l'est pas.
 
 ### Trois façons de reloger un pilote — dont une d'époque
 
