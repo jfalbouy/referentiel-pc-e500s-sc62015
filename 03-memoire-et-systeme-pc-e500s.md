@@ -303,7 +303,17 @@ Autres faits mesurés au passage :
 - ✅ Après `KILL` d'un bloc, **la ROM recale elle-même** `TXTBAS`/`DATBAS`.
 - 📖 Un bloc **`ENG     $$$`** peut apparaître : c'est un fichier de travail de la ROM (`"S1:ENG     .$$$"` en `0DF995h`, voisin du catalogue de formules), pas un pilote.
 - ✅ **Un deuxième pilote au même modèle** : `HISTORY.SYS` (`HISTDRV`, 851 octets, `FILES` 817) s'insère en **`080018h`** sur PC-E500S et en **`0B8018h`** sur PC-E500, en tête de `S1:`, devant `DATA.BAS` — émulateurs, 2026-09-24 (`12-extensions-basic.md` §17quater).
-- ⚠️ **Limite connue, commune avec PLINKC** : un pilote inséré **sous** un autre puis supprimé par `KILL` fait descendre celui du dessus, sans relocation. Non mesuré.
+- ⛔ **Limite mesurée, commune avec PLINKC** : un pilote inséré **sous** un autre puis supprimé par
+  `KILL` fait descendre celui du dessus **sans relocation**, et la machine tombe. ✅ Mesuré le
+  2026-09-25 sur PC-E500S réel (J.-F. Albouy) : `PLINK.SYS` en `080018h` sous `BASEXT.SYS` en
+  `080938h`, `KILL "S1:PLINK.SYS"` → arrêt, hard RESET. Trois pointeurs extérieurs deviennent faux
+  d'un coup : la tête de `d_link` et les deux crochets du BASIC. **La conduite sûre est de détacher
+  le pilote du dessus d'abord** (rendre les crochets, délier le maillon), puis de retirer le bloc,
+  puis de rattacher à la nouvelle adresse — procédure et essai dans
+  `C:\Claude\BASEXT-DRV\essais\KILLSOUS.BAS`.
+- ⚠️ **`SET` et `KILL` sont des commandes de mode direct** : un programme BASIC qui les contient
+  rend `Direct command error` sur la ligne fautive. Toute procédure de retrait de bloc se termine
+  donc par des commandes **tapées**, jamais par un programme qui ferait tout.
 
 ## 8. Zone haute fixe (`FFFD8H`–`FFFFFH`)
 
