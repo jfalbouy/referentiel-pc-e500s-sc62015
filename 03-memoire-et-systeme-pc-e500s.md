@@ -314,13 +314,22 @@ par la machine dans un fichier). Elle donne les deux écarts qui manquaient, et 
 
 - ✅ **`linkbas` fait son travail** : aux trois passages, les deux recherches `41h` rendent
   l'adresse juste et les deux écritures ont lieu.
-- ⛔ **L'anomalie est APRÈS le retour du `CALL`** : `TXTBAS` relu par le programme BASIC vaut de
-  nouveau son **ancienne** valeur, celle d'avant le compactage, tandis que `DATBAS` garde la
-  nouvelle. Ce n'est pas l'installateur : quelque chose, entre le `retf` et la reprise de
-  l'interpréteur, réécrit `TXTBAS`. 📖 La ROM ne l'écrit qu'en trois endroits — `0F9984h`,
-  `0F99B1h`, `0F9D28h` — et lequel s'exécute, d'où il tire une adresse périmée, reste à lire.
-  ⚠️ `PLINKC` et `BASEXT-DRV` fonctionnent pourtant sur matériel réel : la ROM retrouve donc
-  `TEXT.BAS` autrement quand elle en a besoin.
+- ⛔ **L'« anomalie » de `TXTBAS` n'existait pas — et sa dissipation est instructive.** Le
+  programme relisait, après le `CALL`, l'ancienne valeur de `TXTBAS` : j'y ai vu un pointeur
+  périmé. Trois mesures l'ont démenti. ✅ **D'abord par élimination** : la ROM n'écrit `TXTBAS`
+  qu'en **quatre** endroits — `0F9984h`, `0F99B1h`, `0F9D28h`, `0FA56Bh` —, tous passant par
+  `SUB_F96F1`, c'est-à-dire **`IOCS 41h` `search_phys` sur le nom** rangé dans la zone de travail
+  du BASIC : une recherche vivante ne peut pas rendre une adresse périmée. ✅ **Puis par la
+  mesure** (sonde `T485`, 2026-09-26) : une valeur écrite dans `TXTBAS` **survit** à un `CALL`,
+  donc le `CALL` ne sauve ni ne restaure rien. ✅ **Enfin par l'arithmétique**, exacte à l'octet :
+  `DATA.BAS` grandit **vers le haut** et pousse ce qui est au-dessus ; comme le bloc installé lui
+  prend sa place **par en dessous**, `TEXT.BAS` **revient exactement où il était** dès que le
+  BASIC réabsorbe la mémoire libre — `80B51 + (BDF12 − 80018) − 2873 = BDF12`, la valeur lue.
+- ⚠️ **La vraie leçon** : sur cette machine, **exécuter un programme déplace les blocs**. Deux
+  valeurs lues à deux lignes d'intervalle dans le même programme ne sont pas comparables — ses
+  propres variables ont fait grandir `DATA.BAS` entre-temps. Il faut les prendre **au même
+  instant**, ce que fait une trace. ✅ `bd_linkbas` fait donc son travail, et il n'y a rien à
+  corriger dans l'installateur.
 
 ⛔ **Et une distinction qu'il faut tenir, faute de quoi deux mesures justes paraissent se
 contredire** : `FILES` affiche la taille du **fichier** (`[+16h]` − `22h`), le champ `+11h` donne
