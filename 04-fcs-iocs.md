@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-26*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -112,12 +112,18 @@ releve sur un PC-E500S reel (s1-1.bin) -- handle 0 en 0BEE48h :  00 00 E7 21 0F 
 
 Chaque driver installé publie un en-tête (chaîné, voir `03-memoire-et-systeme-pc-e500s.md` §7) :
 
-> 📖 **Ce format n'est pas qu'une structure du manuel : c'est une norme de fait, et elle a une
-> source datée.** La notice du pilote `EXTSLOT` déclare se conformer aux règles de pilotes de
-> périphériques décrites dans l'article **« Pocket Link » de M. Chikashige, *Pocket Computer
-> Journal*, juin 1990** (`07` §3bis) — soit deux ans avant les pilotes que le corpus conserve. Le
-> nom de cet article et celui de `PLINKC`, « Pocket Link Cache » (1999, `06`), se ressemblent ;
-> aucune source du corpus ne les relie, et le second est de langue allemande.
+> ✅ **Ce format n'est pas qu'une structure du manuel : c'est une norme de fait, elle a une source
+> datée, et un auteur.** La notice du pilote `EXTSLOT` déclare se conformer aux règles de pilotes
+> décrites dans l'article **« Pocket Link », *Pocket Computer Journal*, juin 1990** (工学社)
+> — soit deux ans avant les pilotes que le corpus conserve.
+>
+> ⛔ Une version antérieure de ce paragraphe attribuait cet article à « M. Chikashige », d'après
+> la traduction française de la notice d'EXTSLOT, et ajoutait que rien ne le reliait à `PLINKC`.
+> **Les deux points sont faux** : la bibliographie de `PLINKC.DOC` (D. Mizobata, 1999) cite
+> « 近 成人：ポケット・リンク、ポケコン・ジャーナル1990年 6月号、工学社 » — l'article est de
+> **近成人, c'est-à-dire N. Kon**, l'auteur de PLINK, de XASM 1.0 et de VOGUE (`07` §3).
+> « Chikashige » est une lecture erronée des mêmes kanji. La norme de fait des pilotes remonte
+> donc à celui-là même dont le corpus conserve l'assembleur et le compilateur.
 
 | Décalage | Champ | Contenu |
 |---|---|---|
