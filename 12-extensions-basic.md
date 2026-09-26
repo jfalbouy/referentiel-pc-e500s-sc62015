@@ -1,6 +1,6 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
-*Rédigé le 2026-09-03 — mis à jour le 2026-09-25*
+*Rédigé le 2026-09-03 — mis à jour le 2026-09-26*
 
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
@@ -717,6 +717,11 @@ Deux règles, toutes deux payées :
 - ⛔ **MAJUSCULES ASCII.** Les minuscules sont **mangées** à l'import :
   `'A lancer APRES avoir installe BASEXT` ressort `'A  APRES   BASEXT`. Mots-clés et variables
   survivent, les commentaires deviennent illisibles.
+- ⛔ **Pas de guillemet doublé dans une chaîne.** `PRINT "SET ""S1:X.SYS"""` —
+  l'échappement des BASIC Microsoft — est **refusé** ; il faut `CHR$ 34` :
+  `PRINT "SET ";CHR$ 34;"S1:X.SYS";CHR$ 34`. ⚠️ `""` **seul** reste la chaîne
+  vide, et il est valable (`N$=""`, `IF INKEY$ ="" THEN …`) : c'est le guillemet doublé **à
+  l'intérieur** d'une chaîne non vide qui ne passe pas. Relevé le 2026-09-26.
 
 ---
 
