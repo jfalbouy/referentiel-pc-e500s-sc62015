@@ -304,9 +304,33 @@ réelle — de 253 958 à **367 octets** — et **le BASIC perd sa réserve de v
 d'essai est mort sur `Out of memory` en créant sa quatrième variable. Un installateur ne fait que
 passer, mais un programme qui appellerait `47h` pour son compte doit le savoir.
 
-Reste ouvert : ⚠️ pourquoi `(txtbas)` est resté **périmé** après la séquence alors que `(datbas)`
-était juste — c'est précisément le geste dont dépend un installateur. Détail, relevés et sondes :
-`C:\Claude\BASEXT-DRV\sondes\README.md`.
+✅ **Quatrième mesure, 2026-09-26 : la trace de `linkbas`, pas à pas** (sonde `T484`, relevé écrit
+par la machine dans un fichier). Elle donne les deux écarts qui manquaient, et lève l'anomalie :
+
+| Entre deux points de trace | Écart | Ce que cela prouve |
+|---|---|---|
+| avant/après `48h` | **+34** sur `TXTBAS` **et** `DATBAS` | `48h` insère **exactement son en-tête** (`22h`) en tête de chaîne et pousse le reste |
+| avant/après `42h` | **+2839** sur les deux | `42h` **agrandit** le bloc de la taille demandée et décale tout ce qui suit |
+
+- ✅ **`linkbas` fait son travail** : aux trois passages, les deux recherches `41h` rendent
+  l'adresse juste et les deux écritures ont lieu.
+- ⛔ **L'anomalie est APRÈS le retour du `CALL`** : `TXTBAS` relu par le programme BASIC vaut de
+  nouveau son **ancienne** valeur, celle d'avant le compactage, tandis que `DATBAS` garde la
+  nouvelle. Ce n'est pas l'installateur : quelque chose, entre le `retf` et la reprise de
+  l'interpréteur, réécrit `TXTBAS`. 📖 La ROM ne l'écrit qu'en trois endroits — `0F9984h`,
+  `0F99B1h`, `0F9D28h` — et lequel s'exécute, d'où il tire une adresse périmée, reste à lire.
+  ⚠️ `PLINKC` et `BASEXT-DRV` fonctionnent pourtant sur matériel réel : la ROM retrouve donc
+  `TEXT.BAS` autrement quand elle en a besoin.
+
+⛔ **Et une distinction qu'il faut tenir, faute de quoi deux mesures justes paraissent se
+contredire** : `FILES` affiche la taille du **fichier** (`[+16h]` − `22h`), le champ `+11h` donne
+celle du **bloc**. Après `48h` + `42h`, le bloc fait **2873** octets et le fichier **0** : `48h`
+crée l'un et l'autre vides, `42h` ajoute de la **zone libre au bloc** — le sens de son paramètre
+« numéro de pointeur de zone libre » — sans rien écrire dans le fichier. C'est la situation de
+`DATA.BAS`, déjà relevée au point « Autres faits » ci-dessus. **Pour un pilote, c'est le bloc qui
+compte** ; reste à savoir qui renseigne `+16h`.
+
+Détail, relevés et sondes : `C:\Claude\BASEXT-DRV\sondes\README.md`.
 
 ### Trois façons de reloger un pilote — dont une d'époque
 
