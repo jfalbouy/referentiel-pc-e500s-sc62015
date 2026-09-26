@@ -288,8 +288,14 @@ insuffisante ».
 (`47h` puis `48h` **seuls**) : `FILES "S1:"` affiche « `T48     .SYS        0` », soit un bloc de
 **34 octets** — l'en-tête et rien d'autre. Les 2839 octets passés dans `Y` ont été **ignorés**.
 `Data/FCSFunctions.json` décrit pourtant `48h` par « `(ch)` = slot, `X` = nom, **`Y` = taille** » :
-c'est faux, et la ROM le disait — `Y` est écrasé dès la deuxième instruction du traitement
-(`call SUB_F0244`, `0F0351h`), et le gabarit copié donne au bloc une taille de `22h`. **La paire
+c'était faux, et la ROM le disait — `Y` est écrasé dès la deuxième instruction du traitement
+(`call SUB_F0244`, `0F0351h`), et le gabarit copié donne au bloc une taille de `22h`. ✅ **Corrigé
+à la source le 2026-09-26** : la description du carnet dit désormais l'ordre réel des opérations,
+les deux codes d'erreur et la condition « `47h` d'abord », et `pce500.inc` a été **régénéré et
+propagé à ses douze copies** — commentaires seuls, aucune valeur d'`equ` ne change, et `BASEXT.OBJ`,
+`BASEXTDR.OBJ` et `HISTDRV.OBJ` réassemblés sont identiques à l'octet. Au passage, le générateur
+coupait les descriptions **en plein mot** (« propre au PC-E5 ») sans le signaler : il coupe
+maintenant sur un mot et ajoute « … ». **La paire
 `48h` → `42h` n'est donc pas un confort, c'est une obligation** : la ROM crée vide, puis
 dimensionne. Les 2873 octets de la mesure précédente venaient de `42h`.
 
