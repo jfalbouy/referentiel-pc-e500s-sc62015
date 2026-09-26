@@ -282,11 +282,25 @@ insuffisante ».
 | bloc obtenu | **2873 octets = 2839 + `22h`**, attribut **`20h`** — celui du gabarit de la ROM |
 | `47h` | rend vraiment la place : `DATA.BAS` retombe de 251 962 à **420** octets, sa taille réelle |
 
-**La ROM sait donc faire l'insertion qu'un installateur fait à la main.** Ce qui reste à trancher
-avant d'en changer un : ⚠️ lequel de `48h` ou de `42h` donne sa taille au bloc (les deux lectures
-tiennent encore), et ⚠️ pourquoi `(txtbas)` est resté **périmé** après la séquence alors que
-`(datbas)` était juste — c'est précisément le geste dont dépend un installateur. Détail, relevés et
-sondes : `C:\Claude\BASEXT-DRV\sondes\README.md`.
+**La ROM sait donc faire l'insertion qu'un installateur fait à la main.**
+
+⛔ **Troisième mesure, 2026-09-26 : `48h` crée un bloc VIDE, et le carnet se trompe.** Sonde `T483`
+(`47h` puis `48h` **seuls**) : `FILES "S1:"` affiche « `T48     .SYS        0` », soit un bloc de
+**34 octets** — l'en-tête et rien d'autre. Les 2839 octets passés dans `Y` ont été **ignorés**.
+`Data/FCSFunctions.json` décrit pourtant `48h` par « `(ch)` = slot, `X` = nom, **`Y` = taille** » :
+c'est faux, et la ROM le disait — `Y` est écrasé dès la deuxième instruction du traitement
+(`call SUB_F0244`, `0F0351h`), et le gabarit copié donne au bloc une taille de `22h`. **La paire
+`48h` → `42h` n'est donc pas un confort, c'est une obligation** : la ROM crée vide, puis
+dimensionne. Les 2873 octets de la mesure précédente venaient de `42h`.
+
+⚠️ **Effet de bord du compactage, mesuré au passage** : après `47h`, `DATA.BAS` retombe à sa taille
+réelle — de 253 958 à **367 octets** — et **le BASIC perd sa réserve de variables**. Le programme
+d'essai est mort sur `Out of memory` en créant sa quatrième variable. Un installateur ne fait que
+passer, mais un programme qui appellerait `47h` pour son compte doit le savoir.
+
+Reste ouvert : ⚠️ pourquoi `(txtbas)` est resté **périmé** après la séquence alors que `(datbas)`
+était juste — c'est précisément le geste dont dépend un installateur. Détail, relevés et sondes :
+`C:\Claude\BASEXT-DRV\sondes\README.md`.
 
 ### Trois façons de reloger un pilote — dont une d'époque
 
