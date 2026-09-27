@@ -276,6 +276,24 @@ pilote doit tomber à l'intérieur de son bloc** — `+30h` pour le gabarit `DRI
 `+57h` pour PLINKC. Une entrée hors du bloc signale un pilote déplacé, donc une machine qui
 plantera. À vérifier après toute installation, et après tout `KILL`.
 
+✅ **Et il distingue deux chaînes qu'on confond aisément — le même relevé les montre toutes les
+deux, et leurs ordres sont inverses** :
+
+| Chaîne des **blocs** de `S1:` | Chaîne des **devices** (`d_link`) |
+|---|---|
+| `80018` PLINK — 1ᵉʳ installé | `8320F` `RG3:` — **dernier** installé |
+| `80938` BASEXT — 2ᵉ | `8147F` `HIST:` |
+| `8144F` HISTORY — 3ᵉ | `80968` `BEXT:` |
+| `817A2` `DATA.BAS` ← 1ᵉʳ bloc non pilote | `8006F` `L:` — 1ᵉʳ installé |
+| | `F21E7` `STDO:` … ← la chaîne de la ROM |
+
+L'installateur **insère son bloc avant le premier bloc qui n'est pas un pilote**, donc **derrière
+les pilotes déjà là** : l'ordre d'installation est **préservé**, et le premier installé reste en
+tête. Mais il **chaîne son en-tête en tête de `d_link`** : là, l'ordre est **inversé**, le dernier
+installé répond le premier. ⛔ Dire « chacun s'insère en tête, donc le dernier installé se retrouve
+premier » est faux pour les blocs, juste pour les devices (relevé de J.-F. Albouy : PLINK installé
+en premier, resté en tête).
+
 ⚠️ Ce relevé corrobore aussi le modèle mémoire : TMAP affiche la zone libre **entre `DATA.BAS` et
 `TEXT.BAS`**, c'est-à-dire dans le prolongement du bloc `DATA.BAS` — ce que le point 1 déduisait
 de son champ taille (`+11h`), bien plus grand que le fichier.
