@@ -127,7 +127,7 @@ la ROM** (§8) : `HISTDRV` la lit à l'installation.
 | Adresse | Sigle | Description |
 |---|---|---|
 | `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
-| `BFC1B` | `s1_tail` | **Fin de la chaîne des blocs de `S1:`, + 1** (3 octets). 📖 Écrite par `SUB_F029D` (`0F02A8h`), et seulement pour le lecteur 0, par les commandes du device 6 qui changent la chaîne — `42h`, `45h`, `46h`, `47h`, `48h`, plus trois appels au-delà de `0F0A63h` (table de répartition en `0F004Fh`, commandes `3Fh`-`48h`) ; relue en `0E0571h`, où elle est comparée à `[s1_btm]` — vraisemblablement pour qu'une réservation ne morde pas sur la chaîne — et en `0FB630h`. Nom et rôle donnés par E. Kako (`EXTSLOT`, 1991 : « adresse de fin de S1: », §7bis). ⚠️ **Un installateur qui décale les blocs à la main ne la met pas à jour** — ni `EXTSLOT`, ni `PLINKC`, ni `BASEXT-DRV` : piste à mesurer au §7bis. Ajoutée le 2026-09-27 à `Data/SystemAddresses.json`, `pce500.inc` régénéré. |
+| `BFC1B` | `s1_tail` | **Fin de la chaîne des blocs de `S1:`, + 1** (3 octets). 📖 Écrite par `SUB_F029D` (`0F02A8h`), et seulement pour le lecteur 0, par les commandes du device 6 qui changent la chaîne — `42h`, `45h`, `46h`, `47h`, `48h`, plus trois appels au-delà de `0F0A63h` (table de répartition en `0F004Fh`, commandes `3Fh`-`48h`) ; relue en `0E0571h`, où elle est comparée à `[s1_btm]` — vraisemblablement pour qu'une réservation ne morde pas sur la chaîne — et en `0FB630h`. Nom et rôle donnés par E. Kako (`EXTSLOT`, 1991 : « adresse de fin de S1: », §7bis). ✅ **Un installateur qui décale les blocs à la main ne la met pas à jour** — ni `EXTSLOT`, ni `PLINKC`, ni `BASEXT-DRV`. Mesuré sur émulateur le 2026-09-27 : retard exact de la taille du pilote, rattrapé au premier `RUN` (§7bis). Ajoutée le 2026-09-27 à `Data/SystemAddresses.json`, `pce500.inc` régénéré. |
 | `BFC27`/`BFC28` | `SCRNX`/`SCRNY` | Prochaine coordonnée d'affichage sur `STDO:`/`SCRN:`. |
 | `BFC2A` | `LINPTN` | Cadre de points affiché dans une boîte 16 points. |
 | `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). ✅ Six pointeurs, dans l'ordre de `pce500.inc` : `keytbl_1b`, `keytbl_2b`, `keytbl_1b_shift`, `keytbl_2b_shift`, `keytbl_1b_ctrl`, `keytbl_2b_ctrl`, déposés par la commande clavier `3Fh` depuis `0F1C6Dh` (`rom83`) : `0307A4h`, `030806h`, `03092Ch`, `03098Eh`, `030868h`, `0308CAh` — **l'ordre en mémoire (S3EXT) n'est pas celui des pointeurs**. Dans la table CTRL à 2 octets, ← (code matriciel `1Dh`) donne `5Dh` et → (`1Ch`) `5Ch` ; les six tables se retrouvent à l'identique dans `rom53` (à partir de `0F3422h`). |
@@ -517,14 +517,23 @@ avant le premier bloc qui n'est pas un pilote et monte les blocs suivants à la 
 - S'il n'y parvient pas, il affiche `--- PUSH ANY KEY ---`, attend une touche en lisant **directement**
   le clavier (`(0F0h)`/`(0F1h)`/`(0F2h)`), puis saute au MENU par `[0FFFFDh]`.
 
-⚠️ **Piste à mesurer — `[BFC1Bh]` après une insertion manuelle.** `47h` met `s1_tail` à jour. Mais
-le décalage à la main qui suit (`EXTSLOT`, `PLINKC`, `BASEXT-DRV`) fait monter la fin de chaîne de la
-taille du pilote **sans** mettre `s1_tail` à jour. Si rien ne la corrige ensuite, une réservation
-de zone langage machine (`CALL &FFFD8`) pourrait être acceptée alors qu'elle mord sur `AER` ou
-`FUNCKEY`. Le BASIC la corrige peut-être au premier redimensionnement de `DATA.BAS` (`42h` passe
-aussi par `SUB_F029D`). Pour trancher : relever `[BFC1Bh]` et la vraie fin de chaîne avant et après
-une installation, puis après une ligne tapée. **Sonde prête** : `C:\Claude\BASEXT-DRV\sondes\TS1T.*`.
-Elle prend en mode direct des instantanés que le BASIC ne peut pas fausser.
+✅ **`[BFC1Bh]` après une insertion manuelle — mesuré sur émulateur PockEmul le 2026-09-27**
+(J.-F. Albouy, sonde `TS1T`). La sonde prend en mode direct des instantanés que le BASIC ne peut
+pas fausser. Installation de `BASEXT-DRV` :
+
+| Instantané | `FIN` | `s1_tail` | `s1_btm` | Lecture |
+|---|---|---|---|---|
+| avant | `BD61A` | `BD61B` | `BD61B` | en phase (`s1_tail` = `FIN` + 1) : le témoin |
+| juste après | `818F8` | `80DE2` | `BD61B` | **retard de 2839 octets**, la taille du bloc : `818F8` − `B17h` + 1 = `80DE2` |
+| après un `RUN` | `BD61A` | `BD61B` | `BD61B` | de nouveau en phase |
+
+- ✅ `47h` met `s1_tail` à jour, la montée manuelle des blocs ne la touche pas, et le premier `42h`
+  du BASIC (`DATA.BAS` qui regrossit) la rattrape.
+- ✅ **Sans conséquence pratique** : pendant la fenêtre, la chaîne s'arrête loin sous `s1_btm`,
+  car `47h` a rendu toute la réserve de `DATA.BAS`. Une réservation ne mordrait sur la chaîne
+  qu'en demandant environ 245 Ko d'un coup. L'installateur n'a pas à être corrigé. Pour fermer la
+  fenêtre malgré tout, il suffirait d'écrire la vraie fin de chaîne + 1 en `[s1_tail]` après la
+  montée des blocs, comme le fait `SUB_F029D`.
 
 ### Quatre façons de reloger un pilote — dont deux d'époque
 
