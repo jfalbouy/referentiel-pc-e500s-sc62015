@@ -127,6 +127,7 @@ la ROM** (§8) : `HISTDRV` la lit à l'installation.
 | Adresse | Sigle | Description |
 |---|---|---|
 | `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
+| `BFC1B` | `s1_tail` | **Fin de la chaîne des blocs de `S1:`, + 1** (3 octets). 📖 Écrite par `SUB_F029D` (`0F02A8h`), et seulement pour le lecteur 0, par les commandes du device 6 qui changent la chaîne — `42h`, `45h`, `46h`, `47h`, `48h`, plus trois appels au-delà de `0F0A63h` (table de répartition en `0F004Fh`, commandes `3Fh`-`48h`) ; relue en `0E0571h`, où elle est comparée à `[s1_btm]` — vraisemblablement pour qu'une réservation ne morde pas sur la chaîne — et en `0FB630h`. Nom et rôle donnés par E. Kako (`EXTSLOT`, 1991 : « adresse de fin de S1: », §7bis). ⚠️ **Un installateur qui décale les blocs à la main ne la met pas à jour** — ni `EXTSLOT`, ni `PLINKC`, ni `BASEXT-DRV` : piste à mesurer au §7bis. Ajoutée le 2026-09-27 à `Data/SystemAddresses.json`, `pce500.inc` régénéré. |
 | `BFC27`/`BFC28` | `SCRNX`/`SCRNY` | Prochaine coordonnée d'affichage sur `STDO:`/`SCRN:`. |
 | `BFC2A` | `LINPTN` | Cadre de points affiché dans une boîte 16 points. |
 | `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). ✅ Six pointeurs, dans l'ordre de `pce500.inc` : `keytbl_1b`, `keytbl_2b`, `keytbl_1b_shift`, `keytbl_2b_shift`, `keytbl_1b_ctrl`, `keytbl_2b_ctrl`, déposés par la commande clavier `3Fh` depuis `0F1C6Dh` (`rom83`) : `0307A4h`, `030806h`, `03092Ch`, `03098Eh`, `030868h`, `0308CAh` — **l'ordre en mémoire (S3EXT) n'est pas celui des pointeurs**. Dans la table CTRL à 2 octets, ← (code matriciel `1Dh`) donne `5Dh` et → (`1Ch`) `5Ch` ; les six tables se retrouvent à l'identique dans `rom53` (à partir de `0F3422h`). |
@@ -219,6 +220,30 @@ Un programme peut réécrire une de ces adresses pour intercepter l'interruption
 
 Ce format d'en-tête chaîné (adresse du suivant sur 3 octets + identifiant + attributs + adresse d'entrée 3 octets + nom ASCII) permet d'installer un nouveau driver résident sans modifier la ROM : c'est le mécanisme qu'utilise `PLINKC162` (lecteur `L:`, voir `06-ecosysteme-outils.md`) et que documente `Data/SystemDataRegions.csv` sous la clé `iocs_hdr_tbl` (`DF820`, 152 octets, jusqu'à sentinelle `FFFFF`).
 
+📖 **Le même mécanisme permet de *remplacer* un device de la ROM, et pas seulement d'en ajouter un.**
+`EXTSLOT` (E. Kako, 1991, §7bis) chaîne en tête de `d_link` un en-tête qui porte le numéro de
+device **6** — celui de la ROM, en `DF872` — avec les noms `S1:S2:S3:` et l'attribut `0C3h` (nos
+pilotes portent `063h`). Il ne traite qu'une commande, `48h`, et **renvoie toutes les autres** à
+l'entrée d'origine. Il retrouve celle-ci à l'installation en parcourant `d_link` jusqu'au premier
+en-tête de device 6, et la garde dans son bloc (`block_iocs`). Le renvoi est un `callf` vers une
+adresse lue en mémoire :
+
+```asm
+org_iocs:
+        pushu   x
+        mv      x,return_adrs   ; adresse de retour (relogee)
+        pushs   x
+        mv      x,[block_iocs]  ; entree d'origine du device 6
+        pushs   x
+        popu    x
+        retf                    ; "saute" a l'entree d'origine
+return_adrs:
+        retf
+```
+
+Le fonctionnement suppose que l'IOCS **retient le premier en-tête de la chaîne** qui porte le numéro de
+device demandé. Rien ne contredit ce comportement, mais il n'a pas été mesuré ici.
+
 ## 7bis. La chaîne des blocs de `S1:` — où loger un pilote résident
 
 Un pilote résident vit dans un **bloc** de `S1:` (en-tête `0FBh` + nom 8.3 ; attribut relevé `25h` pour `BASEXT.SYS`, `20h` pour les blocs du BASIC — l'**attribut** est en `+0Ch`, et PLINKC y reconnaît un pilote par `mv a,[x+0Ch]` / `test a,00Ch`), protégé comme un fichier, et publie son en-tête IOCS dans la chaîne du §7. **Où** l'insérer dans la chaîne des blocs n'est pas un détail : c'est ce qui décide s'il bougera. Mesuré sur émulateur PC-E500S par J.-F. Albouy le 2026-09-16 (`C:\Claude\BASEXT-DRV\essais\BLOCS.BAS`, `PEEK` seulement ; `CONCEPTION.md` §5bis et §5ter).
@@ -303,7 +328,9 @@ de son champ taille (`+11h`), bien plus grand que le fichier.
 (`Data/FCSFunctions.json` ; `(ch)` = lecteur, `X` = nom, `Y` = taille). Nos installateurs
 n'en usent pas — ils compactent par `47h` puis insèrent à la main —, et un pilote d'époque,
 `EXTSLOT`, **étend** cette commande plutôt que de la contourner (`07` §3bis). **Piste à
-mesurer** : `48h` rend-elle inutile le décalage manuel des blocs du point 3 ? 📖 La lecture du
+mesurer** : `48h` rend-elle inutile le décalage manuel des blocs du point 3 ? ⛔ *Réponse
+(2026-09-27) : **non** dès qu'un pilote est installé, car `48h` crée **sous** les pilotes — voir
+plus bas, « `EXTSLOT` (1991) ».* 📖 La lecture du
 traitement (`0F034Bh`) va dans ce sens — il contrôle la place, refuse un nom déjà pris (`41h`),
 **efface le bit du lecteur** dans `[(iocsw)+3Ah]` (`0F0330h` ; c'est l'octet que l'installateur de
 `BASEXT-DRV` remet à zéro) puis **déplace la mémoire** par la commande `43h` `block_transfer`, avant
@@ -397,20 +424,95 @@ celle du **bloc**. Après `48h` + `42h`, le bloc fait **2873** octets et le fich
 crée l'un et l'autre vides, `42h` ajoute de la **zone libre au bloc** — le sens de son paramètre
 « numéro de pointeur de zone libre » — sans rien écrire dans le fichier. C'est la situation de
 `DATA.BAS`, déjà relevée au point « Autres faits » ci-dessus. **Pour un pilote, c'est le bloc qui
-compte** ; reste à savoir qui renseigne `+16h`.
+compte** ; reste à savoir qui renseigne `+16h`. 📖 **Un témoin de 1991** : le source d'`EXTSLOT`
+nomme `+16h` « file size » et `+19h` « block size », et y écrit la taille du bloc, en-tête
+compris. Le gabarit de la ROM (`0F041Ch`) met `22h` dans `+11h`, `+16h` **et** `+19h` d'un bloc
+vide. Ces deux sources appuient la lecture « taille du fichier » de `+16h`. ⚠️ Elles contredisent
+`SC62015Disassembler/Docs/Synthese/Drivers-IOCS.md`, qui lit `+16h` comme l'offset d'un
+**message de crédit**, d'après `SSFDC`. Les deux lectures ne sont pas départagées : le
+champ change peut-être de sens entre bloc de fichier et bloc de pilote.
 
 Détail, relevés et sondes : `C:\Claude\BASEXT-DRV\sondes\README.md`.
 
-### Trois façons de reloger un pilote — dont une d'époque
+### `EXTSLOT` (1991) : pourquoi `48h` seule est dangereuse quand des pilotes sont installés
+
+Le source d'`EXTSLOT` 1.02 (E. Kako, 1991-1992 ; `07` §3bis) a été lu ligne à ligne le 2026-09-27
+et confronté à `rom83`.
+
+- ✅ **Le source correspond au binaire.** Réassemblé par `xasm2026-4`, `extslot.asm` redonne l'objet
+  d'époque `extslot` **à l'octet près** (1 163 octets en `0BE000h`).
+- ✅ **Le pilote est une copie de la ROM.** Ses sous-programmes reprennent **instruction pour
+  instruction** ceux du device 6 de `rom83` : `get_free` = `SUB_F0244`, `get_tail` = `SUB_F0278`,
+  `s1_tail` = `SUB_F029D`, `get_adrs` = `SUB_F02AF`, `set_flag` = `SUB_F0330`. Son `main` suit le
+  traitement de `48h` (`0F034Bh`) pas à pas, et son gabarit d'en-tête de `22h` octets est
+  **identique** à celui de la ROM (`0F041Ch`).
+- ✅ **La seule différence est une boucle.** Avant de créer le bloc, elle saute les blocs dont
+  l'attribut a les bits `0Ch` à 1 (`loop1`) — le même test que `PLINKC` et `register.lst`.
+  La ROM crée le bloc **à la première place de la chaîne** (`[tête du lecteur]` + `[+12h]`) ;
+  `EXTSLOT` le crée **derrière les pilotes**.
+
+**Pourquoi ce pilote a été écrit** (notice, traduite du japonais) : sur le PC-E500, la ROM se sert
+de `48h` pour initialiser le `RAMFILE`. Un nouveau bloc naît donc en tête du lecteur, alors que le
+PC-1480U, qui n'a pas `48h`, le crée en fin de lecteur. Si un pilote comme Pocket Link occupe déjà
+la tête de `S1:`, « les adresses sont faussées et le système se plante ».
+
+📖 **Ce que dit `rom83`** : le pilote MEMORY FILE (`E:`/`F:`, device 5) appelle **`48h` sur le nom
+`RAMFILE`** — en `0E4DBBh`, via `SUB_E4C4E`, qui charge `(cl)` = 6 et le nom `DB_E4C63` =
+`'RAMFILE    '`. Créer le disque RAM **après** avoir installé `PLINK`, `BASEXT` ou `HISTORY` insérerait
+donc `RAMFILE` **sous** eux. Ils monteraient sans relocation : c'est le mode de plantage du
+`KILL` d'un pilote installé sous un autre, mesuré plus haut.
+
+- ⛔ **Conduite à tenir tant que ce n'est pas mesuré** : créer `E:` (et `F:` sur `S2:`)
+  **avant** d'installer les pilotes, ou installer `EXTSLOT`. On suppose que le déclencheur est
+  `INIT "E:…"` : ce n'est pas vérifié.
+- ⛔ **Conséquence pour la « voie ROM » `47h` → `48h` → `42h`** mesurée ci-dessus (T482) : elle ne
+  vaut que sur une chaîne **sans pilote**. La mesure créait le bloc en `080018h`, la place de
+  `DATA.BAS`. Avec des pilotes déjà là, elle placerait le nouveau **sous** eux. **L'insertion manuelle de
+  `BASEXT-DRV`** — avant le premier bloc qui n'est pas un pilote — **n'est donc pas un pis-aller :
+  c'est la seule qui convienne**, et c'est exactement ce qu'`EXTSLOT` ajoute à la ROM.
+
+📖 **Ce que la lecture ajoute sur `48h`** (ROM et `EXTSLOT` concordants) :
+
+| Point | Détail |
+|---|---|
+| codes d'erreur | `01h` nom contenant un joker `?` (contrôle d'`EXTSLOT` ; la ROM passe par `SUB_E0D69`) · `09h` nom déjà pris (`41h` le trouve) · `0Ch` place insuffisante (mesuré, T48) · **`00h`** lecteur protégé, ou création sous la borne `+15h` |
+| en-tête du lecteur | `+11h` bit 0 = lecteur **protégé** ; `+12h` = offset du premier bloc (`18h` sur `S1:`) ; **`+15h` = une adresse (3 o) qui sert de borne basse**, qui manquait au relevé de `Fichiers-et-slot.md` |
+| `[(iocsw)+3Ah]` | `S1:` → bit **1** effacé (`and a,0FDh`), `S2:` → bit **2** (`and a,0FBh`), `S3:` → rien |
+| fin de chaîne | `SUB_F0278` compte les blocs dans `I`, **écrit `0FFh`** juste après le dernier et rend l'adresse suivante ; `SUB_F029D` la range en **`[BFC1Bh]`** (`s1_tail`, §4) pour `S1:` |
+| capacité de `S2:`/`S3:` | fin du lecteur = tête + capacité × 2048 (11 doublements de `BA`) ; pour `S1:`, c'est `[s1_btm]` |
+| décalage | `43h` `block_transfer` : `X` = source, `Y` = destination (`X` + `22h`), `(si)` = longueur |
+
+📖 **L'installateur d'`EXTSLOT` : la même conduite que `PLINKC`, quatre ans plus tôt.** Il
+compacte (`47h`), refuse une seconde installation (comparaison des 12 octets `0FBh`+nom), insère
+avant le premier bloc qui n'est pas un pilote et monte les blocs suivants à la main. Il **recale
+`TXTBAS`/`DATBAS` sur tous les chemins, erreurs comprises** : les messages d'erreur tombent dans
+`remake_slot`. Deux différences :
+
+- Il retrouve `TEXT.BAS`/`DATA.BAS` **en parcourant lui-même la chaîne**, sur les noms rangés en
+  `[baswrk]+73h`/`+7Fh`, et seulement si l'octet de lecteur en `+72h`/`+7Eh` vaut 0 (`S1:`). `PLINKC`,
+  lui, passe par `41h`.
+- S'il n'y parvient pas, il affiche `--- PUSH ANY KEY ---`, attend une touche en lisant **directement**
+  le clavier (`(0F0h)`/`(0F1h)`/`(0F2h)`), puis saute au MENU par `[0FFFFDh]`.
+
+⚠️ **Piste à mesurer — `[BFC1Bh]` après une insertion manuelle.** `47h` met `s1_tail` à jour. Mais
+le décalage à la main qui suit (`EXTSLOT`, `PLINKC`, `BASEXT-DRV`) fait monter la fin de chaîne de la
+taille du pilote **sans** mettre `s1_tail` à jour. Si rien ne la corrige ensuite, une réservation
+de zone langage machine (`CALL &FFFD8`) pourrait être acceptée alors qu'elle mord sur `AER` ou
+`FUNCKEY`. Le BASIC la corrige peut-être au premier redimensionnement de `DATA.BAS` (`42h` passe
+aussi par `SUB_F029D`). Pour trancher : relever `[BFC1Bh]` et la vraie fin de chaîne avant et après
+une installation, puis après une ligne tapée.
+
+### Quatre façons de reloger un pilote — dont deux d'époque
 
 Un bloc copié à une adresse choisie à l'installation doit voir ses adresses absolues corrigées.
-Trois modèles existent, et le troisième est le plus surprenant :
+Quatre modèles existent, et le troisième est le plus surprenant :
 
 | Modèle | Comment | Où |
 |---|---|---|
 | **Table mesurée** | double assemblage à deux origines, chaque octet qui change est rangé dans un champ de 2 ou 3 octets, table émise au format Kon et vérifiée à une troisième origine | `BASEXT-DRV/outils/reloc.py` ✅ |
 | **Table déclarée** | préfixe `rel` devant chaque instruction à reloger ; l'assembleur émet la table après le code | A62 (N. Kon), `PLINKC`, `xasm2026-4` (`05` §7bis) ✅ |
 | **Analyse du programme** | **aucune table** : l'installateur *analyse* le code et reconnaît lui-même les adresses à corriger | `INSTd`/`INSTt` 1.05 (TORO, 1994) 📖 |
+| **Table écrite à la main** | une étiquette (`p1`…`p16`) posée sur **l'opcode** de chaque instruction à reloger, une table `dp` de ces étiquettes terminée par `-1`. L'installateur fait `inc y` pour passer à l'opérande, ce qui sert aussi à reconnaître la fin : `-1` + 1 = 0 | `EXTSLOT` 1.02 (E. Kako, 1991) ✅ lu, réassemblé |
 
 📖 Le troisième impose des règles à la source, que sa notice énonce (`07` §3bis) et qui disent
 bien ce qu'une analyse peut et ne peut pas faire :
@@ -425,6 +527,10 @@ bien ce qu'une analyse peut et ne peut pas faire :
 
 Il installe sur `S1:` **ou `S2:`** et cherche un numéro de device IOCS libre — la même conduite
 que PLINKC. ⚠️ Rien de tout cela n'a été assemblé ni mesuré ici.
+
+⚠️ **Le quatrième modèle a un piège** : `EXTSLOT` reloge **l'image chargée**, en place, avant de
+la copier. Un second `CALL &BE000` sans nouveau `LOADM` relogerait les mêmes adresses une seconde fois.
+Le test « déjà installé » l'empêche tant que `EXTSLOT.SYS` existe, mais pas après son `KILL`.
 
 Autres faits mesurés au passage :
 

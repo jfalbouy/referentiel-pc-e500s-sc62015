@@ -88,16 +88,18 @@ fichiers `*_traduction_francaise.md`/`.docx` sont les traductions de 2026.
 | Dossier | Contenu | Ce qu'il apporte |
 |---|---|---|
 | `Delta350/`, `contenu_delta/` | **DELTA** 1.5 (1993-01), 2.2 (1993-04), **3.5** (1993-06) + `banktest.asm`, `emstest.asm`, `inst_220.inc` | pilote de **disque RAM de 512 Kio** (`D:`), sur mémoire **bancaire** — exige une modification matérielle lourde ; lancé par `CALL &HBE000`. Les spécifications de périphérique de la 3.5 sont celles de la 2.3, la capacité seule change |
-| `EXTSLOT/` | `extslot.asm` + notice | pilote de **bloc de mémoire d'extension** : il **étend la commande IOCS `48h`** (« création d'un bloc mémoire 2 », `block_create_top`, propre au PC-E500) et crée `EXTSLOT.SYS` sous `S1:`. 📖 Sa notice nomme la **norme de fait des pilotes** : l'article « Pocket Link » de M. Chikashige, *Pocket Computer Journal*, **juin 1990** (`04` §2.1) |
+| `EXTSLOT/` (aujourd'hui rangé à part, dans `C:\Claude\EXTSLOT`) | `extslot.asm`, objet XASM `extslot`, notice `extslot.doc` (Shift-JIS) et sa traduction `README.txt` | pilote de **bloc de mémoire d'extension**, 1.02 (E. Kako, JM2WGN, 1991-1992). Il **remplace le device 6** de la ROM pour la seule commande `48h` (« création d'un bloc mémoire 2 », `block_create_top`, propre au PC-E500) et crée le bloc **derrière les pilotes** au lieu de la tête du lecteur. S'installe lui-même en `EXTSLOT.SYS` sous `S1:`. ✅ **Lu ligne à ligne et réassemblé le 2026-09-27** : l'objet d'époque est reproduit à l'octet près, et le pilote se révèle être une **copie des routines de `rom83`** plus une boucle. Ce qu'il apporte — le `RAMFILE` que la ROM crée par `48h` sous les pilotes, `s1_tail` (`BFC1B`), l'en-tête du lecteur, les codes d'erreur, un quatrième modèle de relocation — est détaillé dans `03` §4, §7 et §7bis. 📖 Sa notice nomme la **norme de fait des pilotes** : l'article « Pocket Link » de **近成人 (N. Kon)**, *Pocket Computer Journal*, **juin 1990** (`04` §2.1). ⛔ Cette ligne l'attribuait à « M. Chikashige », d'après la traduction DeepL du `README.txt`, qui lit mal les kanji du japonais (近成人氏) — l'erreur corrigée au `04` §2.1 était restée ici |
 | `INST105/` | **INSTd / INSTt 1.05** (TORO, 1994) : `instd.asm` (pilote), `instt.asm` (TSR), notice traduite | un **installateur générique d'époque**, troisième modèle de relocation : **par analyse du programme**, sans table (`03` §7bis). Installe sur `S1:` **ou** `S2:`, cherche un numéro IOCS libre, exige code et données séparés (`@@PEND`, `@@DEND`) et interdit les valeurs de 3 octets en `0Exxxxh` |
 | `Zou/` | **Guide de modification de la série E500**, 2ᵉ édition, 1996, « #4041 Lycanthrophy nomi » | brochages `HM62256`/`HM628128`/`HM628512`, CPU 100 broches, et un **schéma** 2×4 Mbit → `S1:` 256 K + `S2:` 256 K + `D:` 512 K, d'après des articles de **Daris** (1995-09-21) et **ganze** (1996-02-26) — voir `09-cartes-meres-ram-interne.md` §4bis |
 | `contenu_diskuty/` | `rdd100` (contrôle de chaîne FAT), `sd110` (défragmentation), `ud100` (récupération de fichiers supprimés), `ds114` (émulateur de répertoires), `extdir10` (répertoires sur `E:`/`F:`) | utilitaires de disque : témoins de ce que le FCS accepte, et de ses limites (« `E:`/`F:` ne gèrent pas les répertoires ») |
 | `contenu_knjsc/` | `KNJSCD` 1.1 et 1.3 (1994), en `.bdf` (fichiers de différences) | pilote de **police kanji** (`KNJFONT.SYS`) adapté pour cohabiter avec DELTA |
 | `contenu_others/` | `mappe230` (`MAPPE.SYS`), `fenix303`, `hyper213`, `cal111`, `memck130`, `dcs100`, plus `install.inc` et `inst_230.inc` | résidents d'époque et **deux includes d'installation** de plus, à comparer aux nôtres |
 
-⚠️ **Rien de ce corpus n'a encore été assemblé, exécuté ni mesuré** dans le cadre de ce
-référentiel : les faits qui en sont tirés sont marqués 📖 (lus dans une notice), jamais ✅. Les
-sources en Shift-JIS n'ont pas été relues ligne à ligne.
+⚠️ **Rien de ce corpus n'a encore été exécuté ni mesuré** dans le cadre de ce référentiel. Les
+faits qui en sont tirés sont marqués 📖 (lus dans une notice ou un source), jamais ✅ quant au
+comportement. **Une exception pour la lecture** : `EXTSLOT` a été relu ligne à ligne, réassemblé à
+l'identique et confronté à `rom83` le 2026-09-27. Les autres sources en Shift-JIS n'ont pas été relues
+ligne à ligne.
 
 - **`PLINKC` 1.62 — la source A62 nomme deux auteurs.** ✅ Relevé dans l'en-tête de
   `xasm2026-4/Exemples/PLINKC/A62/plinkc.a62.asm` : « *Pocket Link Cache Device Driver ver 1.62 /
