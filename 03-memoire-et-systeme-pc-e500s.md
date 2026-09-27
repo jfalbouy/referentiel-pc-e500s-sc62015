@@ -241,8 +241,9 @@ return_adrs:
         retf
 ```
 
-Le fonctionnement suppose que l'IOCS **retient le premier en-tête de la chaîne** qui porte le numéro de
-device demandé. Rien ne contredit ce comportement, mais il n'a pas été mesuré ici.
+✅ **L'IOCS retient le premier en-tête de la chaîne qui porte le numéro de device demandé.** Mesuré
+sur émulateur PockEmul le 2026-09-27 (sonde `TRAMF`, protocole B) : EXTSLOT, installé en tête de
+`d_link` avec le device 6, a répondu au `48h` d'`INIT "E:2K"` à la place de la ROM (§7bis).
 
 ## 7bis. La chaîne des blocs de `S1:` — où loger un pilote résident
 
@@ -456,17 +457,37 @@ de `48h` pour initialiser le `RAMFILE`. Un nouveau bloc naît donc en tête du l
 PC-1480U, qui n'a pas `48h`, le crée en fin de lecteur. Si un pilote comme Pocket Link occupe déjà
 la tête de `S1:`, « les adresses sont faussées et le système se plante ».
 
-📖 **Ce que dit `rom83`** : le pilote MEMORY FILE (`E:`/`F:`, device 5) appelle **`48h` sur le nom
+📖 **Ce que dit `rom83`** (lecture, confirmée par la mesure ci-dessous) : le pilote MEMORY FILE (`E:`/`F:`, device 5) appelle **`48h` sur le nom
 `RAMFILE`** — en `0E4DBBh`, via `SUB_E4C4E`, qui charge `(cl)` = 6 et le nom `DB_E4C63` =
-`'RAMFILE    '`. Créer le disque RAM **après** avoir installé `PLINK`, `BASEXT` ou `HISTORY` insérerait
-donc `RAMFILE` **sous** eux. Ils monteraient sans relocation : c'est le mode de plantage du
+`'RAMFILE    '`. Créer le disque RAM **après** avoir installé `PLINK`, `BASEXT` ou `HISTORY` insère
+donc `RAMFILE` **sous** eux. Ils montent sans relocation : c'est le mode de plantage du
 `KILL` d'un pilote installé sous un autre, mesuré plus haut.
 
-- ⛔ **Conduite à tenir tant que ce n'est pas mesuré** : créer `E:` (et `F:` sur `S2:`)
-  **avant** d'installer les pilotes, ou installer `EXTSLOT`. On suppose que le déclencheur est
-  `INIT "E:…"` : ce n'est pas vérifié. **Sonde prête** : `C:\Claude\BASEXT-DRV\sondes\TRAMF.*`.
-  Elle pose un **leurre**, un bloc d'attribut `25h` relié à rien, puis appelle `INIT "E:2K"`.
-  Le contre-essai se fait avec EXTSLOT.
+✅ **Mesuré sur émulateur PockEmul le 2026-09-27 (J.-F. Albouy, sonde `TRAMF`) : c'est bien `INIT "E:"`, et `RAMFILE`
+naît SOUS les pilotes.** Un **leurre** (bloc `LEURRE  SYS`, attribut `25h`, relié à rien) posé en
+`80018`, puis `INIT "E:2K"` :
+
+| | rang 1 | rang 2 | rang 3 |
+|---|---|---|---|
+| avant l'`INIT` | `80018` LEURRE `25` 34 | `8003A` DATA 252 327 | `BD9E1` TEXT |
+| après l'`INIT` | **`80018` RAMFILE `20` 2048** | **`80818` LEURRE** | `8083A` DATA **250 279** · `BD9E1` TEXT |
+
+- ✅ Le leurre a **monté de 2048 octets sans relocation**. Un vrai pilote aurait laissé son maillon
+  `d_link` et ses crochets sur l'ancienne adresse : la machine serait tombée.
+- ✅ **`INIT` fait lui-même la place** alors que la chaîne était jointive, là où `48h` seul refuse
+  (T48). La place est prise **à `DATA.BAS`** (−2048 exactement) ; les blocs au-dessus de lui ne
+  bougent pas. **Seul ce qui est sous `DATA.BAS` monte — c'est-à-dire les pilotes.**
+- ✅ `E:2K` donne un bloc de **2048 octets tout compris** (`FILES` : 2014 = 2048 − `22h`), attribut
+  `20h`, celui du gabarit de `48h`. Le `RAMFILE` préinstallé de l'image `rom83` porte `21h`.
+- ⛔ **Règle** : **créer `E:` AVANT d'installer un pilote**, et ne jamais refaire d'`INIT "E:…"`
+  pilotes installés : les désinstaller, faire l'`INIT`, puis les réinstaller. `INIT "E:0K"` retire
+  le bloc et fait redescendre ce qui est au-dessus : même danger, déduit du `KILL` sous un pilote
+  (mesuré), pas mesuré directement. ✅ **Le contre-essai avec `EXTSLOT` réussit** (même jour,
+  émulateur). Installé derrière le leurre, EXTSLOT (bloc de 520 octets, en tête de `d_link`) a
+  intercepté le `48h` : `RAMFILE` est né **au rang 3, derrière les deux**, et ni l'un ni l'autre
+  n'a bougé. EXTSLOT 1.02 fonctionne donc sur la ROM 8.3, et rend `INIT "E:…"` sûr s'il est
+  installé **avant** l'`INIT`. Il ne protège pas d'`INIT "E:0K"` (qui ne passe pas par `48h`). Relevés : `C:\Claude\BASEXT-DRV\sondes\README.md`
+  (TRAMF) ; règle reportée dans le mode d'emploi de `BASEXT-DRV`.
 - ⛔ **Conséquence pour la « voie ROM » `47h` → `48h` → `42h`** mesurée ci-dessus (T482) : elle ne
   vaut que sur une chaîne **sans pilote**. La mesure créait le bloc en `080018h`, la place de
   `DATA.BAS`. Avec des pilotes déjà là, elle placerait le nouveau **sous** eux. **L'insertion manuelle de
