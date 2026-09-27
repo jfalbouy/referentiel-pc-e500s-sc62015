@@ -1,6 +1,6 @@
 # Mémoire et système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+*Rédigé le 2026-08-26 — mis à jour le 2026-09-27*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier détaille la carte mémoire du PC-E500S (interne + externe), les registres d'E/S, les vecteurs d'interruption et les points d'entrée IOCS. Sources principales : le manuel *ESR-L CPU Instruction Manual*, le *Technical Reference Manual PC-E500*, et la feuille de dépouillement `Docs/Doc technique/PCE500 Description mémoire.xls.xlsx` déjà constituée dans le projet `SC62015Disassembler` (adresses recoupées avec des listings XASM réels).
 
@@ -237,6 +237,48 @@ La chaîne est jointive et se termine en `0BDA1Ah`, contre `[s1_btm]` − 1. Ce 
 1. ✅ **`DATA.BAS` est le premier bloc et contient toute la mémoire libre.** Il n'y a pas de place « après la chaîne » : elle est **dans** `DATA.BAS`, et `TXTBAS`/`DATBAS` (§3) désignent ces deux blocs.
 2. ⛔ **Un bloc ajouté en fin de chaîne bouge.** Au premier besoin de place du BASIC, `DATA.BAS` regrossit et **pousse vers le haut** tout ce qui le suit ; le bloc est déplacé **sans relocation**, et les pointeurs extérieurs (maillon IOCS, crochets du BASIC) désignent l'ancienne adresse. Mesuré : bloc copié en `0804E5h`, relu en `0BCF30h` au `RUN` suivant ; la ligne tapée ensuite a arrêté PockEmul (FACTORY RESET). C'est ce que faisait le `DRIVER_TEMPLATE` de `xasm2026-4`, validé seulement jusqu'à « apparaît dans `FILES` ».
 3. ✅ **Le modèle qui tient est celui de `PLINKC` 1.62**, validé sur matériel : compacter (IOCS device 6, `47h`), insérer **avant le premier bloc qui n'est pas un pilote** (donc avant `DATA.BAS`), décaler les blocs suivants vers le haut, puis **recaler `TXTBAS`/`DATBAS`** (`linkbas` : IOCS `41h` sur les noms rangés en `[baswrk]+72h`/`+7Eh`) — sur **tous** les chemins qui suivent le compactage, erreurs comprises. Mesuré avec `BASEXT-DRV` 0.2 : bloc en `080018h`, **immobile** après une ligne tapée, `DATA.BAS` et `TEXT.BAS` regrossissant derrière lui.
+
+#### ✅ Confirmé dans la nature, sur PC-E500S réel (2026-09-27) — et le contrôle qui l'évite
+
+Un relevé de **TMAP 1.05** (TORO, 1994) pris par J.-F. Albouy sur sa machine, après avoir installé
+plusieurs pilotes, montre le défaut **en flagrant délit, avant qu'il ne morde** :
+
+```
+80018 PLINK   .SYS 25   2302 <dev>L:          entree d_link : 8006F  (+57h)
+80938 BASEXT  .SYS 25   2805 <dev>BEXT:       entree d_link : 80968  (+30h)
+8144F HISTORY .SYS 25    817 <dev>HIST:       entree d_link : 8147F  (+30h)
+817A2*DATA    .BAS 20    431 <dat>
+81973 (free)          235369
+BB0DC*TEXT    .BAS 20   4445 <bas>
+BC25B FUNCKEY / BC2C4 AER / BC2EB ENG.$$$
+BC945 REGIST3 .SYS 25   3251 <dev>            entree d_link : 8320F  <<< HORS DU BLOC
+```
+
+Les trois pilotes **insérés en tête** ont leur entrée IOCS **dans** leur bloc. Le quatrième,
+installé **en fin de chaîne** par son propre installateur, ne l'a plus : `8320F` tombe au milieu
+de la **zone libre**. L'arithmétique dit ce qui s'est passé — à `+30h` du bloc comme ses deux
+voisins de même gabarit, REGIST3 était en `831DF` à l'installation ; il est en `BC945` :
+
+```
+BC945 − 831DF = 39766h = 235 366 octets ≈ la zone libre (235 369)
+```
+
+**Le bloc a monté d'exactement la taille de la zone libre, sans relocation, et son maillon
+`d_link` est resté sur l'ancienne adresse.** Le pilote répondait pourtant encore : son ancienne
+copie gisait intacte dans la mémoire libre, et il s'exécutait depuis là.
+
+⛔ **La suite, mesurée le même jour** : dès que le BASIC a mordu dans cette zone, l'appel suivant
+a **planté la machine** — au point qu'elle **refusait de se rallumer** et qu'un hard RESET a été
+nécessaire. « Ça marche » ne voulait donc dire que « rien n'a encore écrasé le cadavre ».
+
+✅ **Le contrôle, gratuit et immédiat** : dans un relevé TMAP, **l'entrée déclarée de chaque
+pilote doit tomber à l'intérieur de son bloc** — `+30h` pour le gabarit `DRIVER_TEMPLATE`,
+`+57h` pour PLINKC. Une entrée hors du bloc signale un pilote déplacé, donc une machine qui
+plantera. À vérifier après toute installation, et après tout `KILL`.
+
+⚠️ Ce relevé corrobore aussi le modèle mémoire : TMAP affiche la zone libre **entre `DATA.BAS` et
+`TEXT.BAS`**, c'est-à-dire dans le prolongement du bloc `DATA.BAS` — ce que le point 1 déduisait
+de son champ taille (`+11h`), bien plus grand que le fichier.
 
 📖 **La ROM sait elle-même créer un bloc en tête** : la commande IOCS `48h` du device 6,
 `block_create_top`, « création d'un bloc mémoire **en tête** des blocs, propre au PC-E500 »
