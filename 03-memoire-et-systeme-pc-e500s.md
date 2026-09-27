@@ -464,7 +464,9 @@ donc `RAMFILE` **sous** eux. Ils monteraient sans relocation : c'est le mode de 
 
 - ⛔ **Conduite à tenir tant que ce n'est pas mesuré** : créer `E:` (et `F:` sur `S2:`)
   **avant** d'installer les pilotes, ou installer `EXTSLOT`. On suppose que le déclencheur est
-  `INIT "E:…"` : ce n'est pas vérifié.
+  `INIT "E:…"` : ce n'est pas vérifié. **Sonde prête** : `C:\Claude\BASEXT-DRV\sondes\TRAMF.*`.
+  Elle pose un **leurre**, un bloc d'attribut `25h` relié à rien, puis appelle `INIT "E:2K"`.
+  Le contre-essai se fait avec EXTSLOT.
 - ⛔ **Conséquence pour la « voie ROM » `47h` → `48h` → `42h`** mesurée ci-dessus (T482) : elle ne
   vaut que sur une chaîne **sans pilote**. La mesure créait le bloc en `080018h`, la place de
   `DATA.BAS`. Avec des pilotes déjà là, elle placerait le nouveau **sous** eux. **L'insertion manuelle de
@@ -500,7 +502,8 @@ taille du pilote **sans** mettre `s1_tail` à jour. Si rien ne la corrige ensuit
 de zone langage machine (`CALL &FFFD8`) pourrait être acceptée alors qu'elle mord sur `AER` ou
 `FUNCKEY`. Le BASIC la corrige peut-être au premier redimensionnement de `DATA.BAS` (`42h` passe
 aussi par `SUB_F029D`). Pour trancher : relever `[BFC1Bh]` et la vraie fin de chaîne avant et après
-une installation, puis après une ligne tapée.
+une installation, puis après une ligne tapée. **Sonde prête** : `C:\Claude\BASEXT-DRV\sondes\TS1T.*`.
+Elle prend en mode direct des instantanés que le BASIC ne peut pas fausser.
 
 ### Quatre façons de reloger un pilote — dont deux d'époque
 
