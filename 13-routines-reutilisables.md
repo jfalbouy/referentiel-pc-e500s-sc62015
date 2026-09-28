@@ -235,6 +235,59 @@ partout. Les retrouver par leur **empreinte de code** plutôt que par leur adres
 liste plus large — et une table de correspondance par version, qui est ce qu'il faudrait pour
 écrire un programme portable qui appelle l'interpréteur.
 
+### 2.7 ✅ La table de correspondance entre les trois ROM — retrouvées par leur code
+
+Le §2.6 disait que 24 routines n'avaient pas bougé. **Il ne disait pas où étaient passées les
+autres.** La question se règle en cherchant les routines par leur **code** plutôt que par leur
+adresse.
+
+**La méthode**, et ses deux difficultés :
+
+1. **Masquer les opérandes d'adresse.** Une routine déplacée garde ses instructions mais voit
+   changer tous ses `callf`, `jpf`, `call`, `jp` — et aussi `jpz`, `jpnz`, `jpc`, `jpnc`, que
+   j'avais oubliés au premier essai : le rendement est passé de **105 à 205** routines retrouvées
+   quand je les ai masqués à leur tour. Une empreinte de 24 octets suffit.
+2. **Suivre les trampolines.** Les services du BASIC ne sont pas des routines mais des **thunks de
+   quatre octets** — `call <cible>` puis `retf`. Leur empreinte ne compare que deux octets, ce qui
+   ne cherche rien. Il faut donc chercher la **cible**, puis, dans la ROM visée, retrouver le
+   trampoline qui l'appelle.
+
+**Résultat** : sur les 280 points d'entrée de `rom83`, **205 sont retrouvés dans `rom75` et 207
+dans `rom53`**. ✅ Contrôle : **chacune des adresses trouvées tombe sur une frontière
+d'instruction** dans le désassemblage de sa propre ROM — zéro faux positif sur 412 correspondances.
+
+**Et voici ce que le §2.6 ne pouvait pas donner : les services du BASIC, sur les trois machines.**
+
+| Service | `rom83` (8.3) | `rom75` (7.5) | `rom53` (5.3) |
+|---|---|---|---|
+| `chknum` | `0EFBF3h` | `0EFECDh` | `0EFEAFh` |
+| `dec2bin` | `0EFAD4h` | `0EFDAEh` | `0EFD90h` |
+| `bin2dec` | `0EFB6Fh` | `0EEF99h` | `0EEF7Eh` |
+| `eval` | `0EF26Eh` | `0EF548h` | `0EF52Dh` |
+| `alloc` | `0EF0DDh` | `0EF3B7h` | `0EF39Ch` |
+| adresse d'une variable simple | `0FB334h` | `0FBA02h` | `0FB981h` |
+| `PUTBLKF` | `0F227Fh` | `0F29E1h` | `0F2991h` |
+| `CRLFF` | `0FBEBFh` | `0FC589h` | `0FC508h` |
+
+Les cinq premières ont été **vérifiées une à une** dans le désassemblage de leur ROM : à chacune de
+ces adresses on lit bien `call <cible>` suivi de `retf`.
+
+> **Ce que cela ouvre** : une extension du BASIC **portable sur les trois machines**. Jusqu'ici la
+> seule conduite sûre était de lire la version en `0FFFF0h` et de **refuser** ce qu'on ne
+> connaissait pas (`HISTDRV`). Avec cette table, on peut lire la version et **choisir le jeu
+> d'adresses** — trois `equ` conditionnels, et `BASEXT` tournerait sur un PC-E500 comme sur un
+> PC-E500S.
+>
+> ⚠️ Mais la table n'a **pas été éprouvée sur machine** : elle est établie par identité de code,
+> ce qui est solide, pas par exécution. Avant de la publier comme acquise, il faudrait appeler
+> `dec2bin` à `0EFDAEh` sur une vraie 7.5 et voir ce qui revient.
+
+⚠️ **Les 67 à 75 routines non retrouvées** ne sont pas forcément absentes : une empreinte trop
+courte (un trampoline dont la cible bouge aussi), une routine réellement réécrite, ou un décalage
+d'instruction suffisent à la manquer. La table dit ce qu'elle a trouvé, pas ce qui existe.
+
+Table complète des 280 lignes : `Documentation/rom-correspondance-3roms.txt`.
+
 ---
 
 ## 3. Les routines du référentiel
