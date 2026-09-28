@@ -317,6 +317,36 @@ refuser avec l'erreur 33 — c'est sa limite mesurée (§2.1). Une adresse fauss
 refus propre à cette valeur exacte : **ce test ne vérifie pas seulement que ça marche, il vérifie
 qu'on appelle bien `dec2bin`.**
 
+⛔ **Et ce que la sonde a réellement appris, qui vaut mieux que ce qu'elle cherchait.** Trois
+mesures successives sur PC-E500S (2026-09-28) :
+
+| Essai | Résultat | Ce qu'il apprend |
+|---|---|---|
+| `X` passé tel quel à `chknum` | erreur **90**, type | `X` désigne le **guillemet ouvrant** : `chknum` évaluait une chaîne |
+| six octets relevés en `[X]` | `22 31 32 33 34 35` pour `"12345"`, `22 39 22 3A FE 62` pour `"9"` | `X` pointe dans le **texte de programme tokenisé** — on voit le `:` et le token suivant |
+| guillemet sauté, chiffres présentés à `chknum` | erreur **10**, syntaxe | ⛔ **les chiffres ASCII ne sont pas un nombre pour l'interpréteur** |
+
+**La cause est dans le format du texte tokenisé** : une constante numérique n'y est pas de l'ASCII,
+elle s'écrit **`1Dh` + attributs + exposant + chiffres BCD** (`Codes_BASIC`, et la skill
+`references/basic.md` §4). `chknum` lit du texte de programme et n'y cherche que cette forme-là ;
+les chiffres d'une chaîne littérale ne sont pas de sa grammaire, et son erreur 10 est juste.
+
+> ⛔ **Conclusion, et elle est nette : on ne nourrit pas `chknum` depuis un `CALL &adr "texte"`.**
+> Ces services attendent le **contexte de l'interpréteur** — un cadre poussé, et `X` sur du texte
+> tokenisé. Le seul appelant légitime est une **extension du BASIC** installée par les deux
+> crochets (`12`), c'est-à-dire ce que fait BASEXT.
+
+✅ **Un acquis tout de même, et il est solide** : la mécanique de choix des adresses fonctionne.
+La sonde a lu `8.3`, posé `0EFAD4h` dans l'opérande de son `callf`, appelé, et reçu une erreur
+**propre** — 90 puis 10, jamais un plantage. L'appel à une adresse choisie à l'exécution est donc
+éprouvé ; c'est l'argument qui était mal formé.
+
+⚠️ **Une faute de discipline, payée sur la machine.** La première version ne rendait `BP` que sur
+le chemin de succès. Six appels en erreur ont donc laissé `BP` décalé de six fois quinze octets, et
+la machine s'est mise à refuser ce qu'elle acceptait — « `CALL` n'accepte plus les chaînes ».
+**`BP` se rend en ABSOLU, sur tous les chemins**, comme le fait BASEXT (`12` §5) : la sonde sauve
+`BP` à l'entrée et le réécrit à la sortie, quelle qu'elle soit.
+
 Emploi, sur l'émulateur PC-E500 (7.5) puis sur le PC-E500S (8.3) :
 
 ```basic
