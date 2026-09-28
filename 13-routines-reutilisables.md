@@ -288,6 +288,47 @@ d'instruction suffisent à la manquer. La table dit ce qu'elle a trouvé, pas ce
 
 Table complète des 280 lignes : `Documentation/rom-correspondance-3roms.txt`.
 
+#### La sonde qui mettra la table à l'épreuve — `Documentation/T2BIN.ASM`
+
+170 octets. Elle **lit la version** en `0FFFF0h`, **réécrit l'opérande de ses deux `callf`**
+(l'idiome de `MEMCHECK`, déjà employé par le filtre de `XCONSOLE`), puis évalue l'argument du
+`CALL` et le convertit :
+
+```asm
+        mv      a,[rom_majeure]
+        cmp     a,008H
+        jrz     v83
+        ...
+v75:    mv      x,chknum75              ; 0EFECDh
+        mv      y,dec2bin75             ; 0EFDAEh
+pose:
+        mv      [!ap_chknum+1],x        ; l'operande du callf, reecrit
+        mv      [!ap_dec2bin+1],y
+        popu    x                       ; le texte de l'argument du CALL
+ap_chknum:
+        callf   000000H                 ; <- reecrit
+```
+
+Une version inconnue n'est pas devinée : la sonde refuse (état 1). Elle signe ses octets (`0D2h`),
+comme l'exige la leçon des sondes précédentes, et rend toujours la main **retenue claire**.
+
+**L'essai décisif est le dernier** : `CALL &BF000 "1048576"`, soit 2²⁰. `dec2bin` **doit** le
+refuser avec l'erreur 33 — c'est sa limite mesurée (§2.1). Une adresse fausse ne produirait pas un
+refus propre à cette valeur exacte : **ce test ne vérifie pas seulement que ça marche, il vérifie
+qu'on appelle bien `dec2bin`.**
+
+Emploi, sur l'émulateur PC-E500 (7.5) puis sur le PC-E500S (8.3) :
+
+```basic
+POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
+LOAD M "X:T2BIN.OBJ"
+RUN                                    ' T2BIN.BAS : six essais, dont 2^20
+```
+
+Attendu : `0 = 0`, `9 = 9`, `65535 = 65535`, `100*3+45 = 345`, `1048575 = 1048575`, puis
+`1048576 : ETAT 3 ERR 33`. Et pour chacun, l'adresse de `dec2bin` réellement employée s'affiche —
+`EFAD4` sur 8.3, `EFDAE` sur 7.5, `EFD90` sur 5.3.
+
 ---
 
 ## 3. Les routines du référentiel
