@@ -59,6 +59,7 @@ en tant que **témoignages**, attribués à leur auteur ou à son pseudonyme.
 | `sharp-pce500s-basext-drv` | PolyForm Noncommercial 1.0.0 | son installateur dérive du `DRIVER_TEMPLATE` et de PLINKC : voir son propre `NOTICE.md` |
 | `sharp-pce500-plinkc-` | voir son `NOTICE` | archive de 1999 conservée intacte dans `original/`, à côté d'une version modernisée |
 | `sharp-pce500s-keyboard_history` | **privé** | il porte le TSR de *History 1.11* (TORO, 1994) |
+| `sharp-pce500s-tmap` | **privé** | il porte *Tmap 1.05* (TORO, 1994) et sa réécriture *Tmap 2.00* ; la notice d'origine ne permet la modification que pour un usage personnel |
 | `sharp-pce500s-uuencode` | **privé** | il conserve les binaires MS-DOS de 1993 (R. Marks) comme témoins |
 
 ## 5. Marques
