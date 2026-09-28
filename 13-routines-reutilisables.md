@@ -87,6 +87,63 @@ en silence, et cela s'accumule.
 | compacter, créer un bloc, le dimensionner | IOCS device 6, `47h` / `48h` / `42h` | `03` §7bis |
 | écran : effacer, défiler, lire/écrire un motif | IOCS device 0, `51h`, `47h`/`48h`, `55h`/`56h` | `04` §2.4 |
 
+### 2.4 Les routines internes de la ROM — ⛔ huit sur quatre-vingt-une sont appelables
+
+Le désassembleur a produit un catalogue de **81 routines de `rom83`** avec leur contrat, leur
+taille et leur nombre d'appelants (`SC62015Disassembler/Docs/Routines-ROM-PC-E500S.asm`). La
+tentation est grande d'y puiser. **Elle se heurte à une règle qui ne se négocie pas :**
+
+> Une routine de la ROM n'est appelable depuis la zone langage machine que si elle finit par
+> **`RETF`**. Celles qui finissent par `ret` rendent la main **dans la page où elles s'exécutent**,
+> c'est-à-dire en pleine ROM : `callf` empile trois octets, leur `ret` n'en dépile que deux, et le
+> programme part où personne ne l'attend.
+
+Le tri est donc mécanique, et il est sévère : **71 des 81 finissent par `ret` seul**. Il en reste
+huit, plus les cinq services du §2.1 et les quatre portes officielles (`0FFFD8h`, `0FFFDCh`,
+`0FFFE4h`, `0FFFE8h`). Les voici, contrats relevés dans le désassemblage :
+
+| Routine | Adresse | Entrée → Sortie | Détruit |
+|---|---|---|---|
+| **`PUTBLKF`** | `0F227Fh` | `X` = texte, `Y` = **nombre d'octets** → affiché à l'écran ; `cy` = erreur | `A`, `X`, `Y`, `IL`, `(cl)` |
+| **`CRLFF`** | `0FBEBFh` | rien → `CR`+`LF` sur le device **courant du BASIC** | `A`, `BA`, `X`, `Y`, `I` |
+| **`DIRNAME`** | `0E0D53h` | `X` = entrée de répertoire (8+3), `Y` = destination (12 o) → `NOM.EXT` écrit | `A`, `BA`, `X`, `Y`, `IL` |
+| **`NAMEMTCH`** | `0E0CCBh` | `X` = motif (8+3), `Y` = nom → `cy` = 0 si correspondance | `A`, `IL`, `(000h)` |
+| **`NEXTBLK`** | `0F0E9Bh` | `X` = bloc de départ, `Y` = zone de 3 o → `X` sur le premier octet qui n'est pas `0FBh` | `A`, `X`, `Y`, `IL` |
+| **`PUTBLK`** | `0EA480h` | `X` = source, **`IL`** = nombre d'octets → émis sur le **driver courant** | `A`, `X`, `IL` |
+| `CALHEX` / `CALDECI` | `0EEAFEh` / `0EEAEEh` | les tokens `HEX` et `DECI` : une **bascule d'affichage**, ⚠️ pas une conversion | — |
+
+**La plus utile des huit tient en quatre instructions** — c'est la réponse la plus courte à
+« afficher un texte de longueur connue » :
+
+```asm
+0F227Fh  mv    (cl),000H       ; handle 0 = l'ecran
+         mv    il,004H         ; fonction FCS 004h : write_block
+         callf fcs_call
+         retf
+```
+
+⚠️ **Trois pièges, tous relevés dans le désassemblage :**
+
+- `PUTBLKF` : **`IL` n'est pas le compte**, c'est le numéro de fonction FCS ; la longueur est dans
+  `Y`. Les confondre émet un nombre d'octets arbitraire. (`PUTBLK`, lui, prend bien le compte dans
+  `IL` — les deux se ressemblent et ne s'emploient pas pareil.)
+- `CRLFF` : le device vient de `[(baswrk)+06Ch]`, **celui que le BASIC a sélectionné**, pas d'un
+  paramètre.
+- `NAMEMTCH` : elle écrit dans `(000h)` et manipule `BP` par `PMDF` — à n'employer qu'avec la zone
+  de travail du système en place. Son joker est le **point d'interrogation** (`03Fh`), pour un
+  caractère ; **il n'y a pas d'étoile**.
+
+⛔ **Et la réserve qui vaut pour toute cette section** : ces adresses sont celles de **`rom83`
+(PC-E500S 8.3)**. Rien ne garantit qu'elles soient les mêmes sur une autre révision — c'est même
+l'inverse qui est établi : **sept des dix entrées de drivers sur dix diffèrent entre `rom53` et
+`rom83`** (`03` §7), et l'éditeur du BASIC range sa touche en `(BP+2Ah)` sur les ROM 5.x-7.x contre
+`(BP+2Bh)` sur la 8.3 (`03` §3bis). Un programme qui appelle la ROM **lit d'abord sa version** en
+`0FFFF0h`/`0FFFF1h` et refuse ce qu'il ne connaît pas — c'est ce que fait `HISTDRV`.
+
+**Les 71 autres ne sont pas perdues pour autant** : elles restent précieuses à la *lecture* — pour
+comprendre ce que fait la ROM, retrouver un algorithme, ou nommer une adresse dans un
+désassemblage. Elles ne sont simplement pas *appelables*.
+
 ---
 
 ## 3. Les routines du référentiel
