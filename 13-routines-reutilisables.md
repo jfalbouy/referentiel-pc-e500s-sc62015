@@ -98,9 +98,8 @@ tentation est grande d'y puiser. **Elle se heurte à une règle qui ne se négoc
 > c'est-à-dire en pleine ROM : `callf` empile trois octets, leur `ret` n'en dépile que deux, et le
 > programme part où personne ne l'attend.
 
-Le tri est donc mécanique, et il est sévère : **71 des 81 finissent par `ret` seul**. Il en reste
-huit, plus les cinq services du §2.1 et les quatre portes officielles (`0FFFD8h`, `0FFFDCh`,
-`0FFFE4h`, `0FFFE8h`). Les voici, contrats relevés dans le désassemblage :
+Le tri est donc mécanique, et il est sévère : **71 des 81 routines du catalogue finissent par
+`ret` seul**. Il en reste huit, dont voici les contrats, relevés dans le désassemblage :
 
 | Routine | Adresse | Entrée → Sortie | Détruit |
 |---|---|---|---|
@@ -139,6 +138,49 @@ l'inverse qui est établi : **sept des dix entrées de drivers sur dix diffèren
 `rom83`** (`03` §7), et l'éditeur du BASIC range sa touche en `(BP+2Ah)` sur les ROM 5.x-7.x contre
 `(BP+2Bh)` sur la 8.3 (`03` §3bis). Un programme qui appelle la ROM **lit d'abord sa version** en
 `0FFFF0h`/`0FFFF1h` et refuse ce qu'il ne connaît pas — c'est ce que fait `HISTDRV`.
+
+### 2.5 Le balayage complet — 280 points d'entrée, et la méthode pour les trouver
+
+Les huit du §2.4 sont les seules **du catalogue documenté**. La ROM en offre bien davantage, et il
+n'est pas nécessaire de les lire une par une pour les trouver : **une routine que la ROM
+elle-même appelle par `CALLF` rend forcément la main par `RETF`**. Le critère se renverse donc en
+une recherche mécanique.
+
+Balayage de `rom83` (2026-09-28, `e500dasm` en mode flot, 76 329 instructions décodées) :
+
+| Mesure | Valeur |
+|---|---|
+| sites `CALLF` dans la ROM | **744** |
+| cibles distinctes | **295** |
+| dont les portes officielles (`0FFFD8h`, `0FFFDCh`, `0FFFE4h`, `0FFFE8h`) | 4 |
+| cibles atteignant un `RETF` avant tout `ret` | **280** |
+
+**280 points d'entrée appelables depuis un programme utilisateur** — la liste complète, avec le
+nombre d'appelants de chacun, est dans `Documentation/rom-callf.txt`. Les plus sollicités sont
+déjà connus de ce référentiel, ce qui valide la méthode :
+
+| Adresse | Appels | Ce que nous en savons |
+|---|---|---|
+| `0EF0DDh` | 23 | `alloc` — réserve `BA` octets sur `U` (§2.1) |
+| `0EF26Eh` | 21 | `eval` — évalue une expression complète (§2.1) |
+| `0EFB6Fh` | 7 | `bin2dec` (§2.1) |
+| `0EFBF3h` | 5 | `chknum` (§2.1) |
+| `0F0063h` | 9 | le traitement IOCS `41h` `search_phys` du device 6 (`03` §7bis) |
+| `0F00C3h` | 5 | IOCS `42h` `block_resize` — celui qui dimensionne un bloc |
+| `0F01C1h` | 5 | IOCS `43h` `block_transfer` — le déplacement de mémoire |
+| `0F0E9Bh` | 6 | `NEXTBLK` (§2.4) |
+| `0FB334h` | 8 | ⚠️ calcule l'**adresse d'une variable simple** du BASIC — `(datbas)` + `[+32h]` + 5 + (lettre − `41h`) × 12 (`12` §17) |
+| `0FE8B7h` | 10 | le traitement d'erreur vers lequel `PUTBLK` saute (`jpf`) |
+
+⚠️ **Ce que le balayage ne dit pas** : ce que fait chacune des 280, ni ce qu'elle attend. Il donne
+des **points d'entrée légitimes**, pas des contrats — et un point d'entrée sans contrat n'est pas
+utilisable. Les identifier reste un travail de lecture, routine par routine ; les 81 du catalogue
+en sont le début, et le nombre d'appelants indique par où commencer.
+
+⛔ Et la réserve du §2.4 vaut entière : ces 280 adresses sont celles de **`rom83`**. Le même
+balayage sur `rom53` ou `rom75` donnerait d'autres adresses — c'est d'ailleurs une mesure à faire,
+car recouper les trois listes dirait lesquelles de ces routines sont **stables d'une révision à
+l'autre**, donc sur lesquelles un programme portable peut s'appuyer.
 
 **Les 71 autres ne sont pas perdues pour autant** : elles restent précieuses à la *lecture* — pour
 comprendre ce que fait la ROM, retrouver un algorithme, ou nommer une adresse dans un
