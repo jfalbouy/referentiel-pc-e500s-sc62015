@@ -186,6 +186,55 @@ l'autre**, donc sur lesquelles un programme portable peut s'appuyer.
 comprendre ce que fait la ROM, retrouver un algorithme, ou nommer une adresse dans un
 désassemblage. Elles ne sont simplement pas *appelables*.
 
+### 2.6 ✅ Lesquelles survivent d'une ROM à l'autre — la mesure qui rend un programme portable
+
+Le même balayage a été fait sur les **trois images du corpus** : `rom53` (5.3, série ancienne),
+`rom75` (7.5, PC-E500/PC-E550) et `rom83` (8.3, PC-E500S). Le résultat commence par une régularité
+frappante :
+
+| ROM | Instructions décodées | Sites `CALLF` | Points d'entrée `RETF` |
+|---|---|---|---|
+| `rom53` | 76 076 | 740 | **280** |
+| `rom75` | 76 117 | 743 | **280** |
+| `rom83` | 76 329 | 744 | **280** |
+
+**Exactement 280 dans chacune** — les trois ROM sont la même architecture, réarrangée. Car les
+adresses, elles, ne suivent pas : **28 seulement sont communes aux trois**, et une adresse commune
+ne suffit pas à faire une routine commune. En comparant les **octets** à chacune de ces adresses :
+
+- ✅ **24 portent exactement le même code** — même début, mêmes appelants (`10/10/10`, `4/4/4`…) ;
+- ⛔ **4 sont de pures coïncidences d'adresse** : `0DF9A7h`, `0DF9C4h`, `0DF9D7h`, `0E0043h`. Le
+  code y diffère. Les appeler parce qu'« elles sont dans les trois ROM » serait exactement l'erreur
+  que cette vérification évite.
+
+**Et les 24 stables se répartissent en deux familles, ce qui est tout l'enseignement :**
+
+| Plage | Ce qui s'y trouve |
+|---|---|
+| `0DF8B8h` – `0E230Fh` | le **système de fichiers** et les services de device — dont `NAMEMTCH` (`0E0CCBh`) et `DIRNAME` (`0E0D53h`) |
+| `0F0063h` – `0F0A19h` | les **traitements du device 6** : `41h` `search_phys`, `42h` `block_resize`, `43h` `block_transfer`, `44h` `block_rename`, `45h` `block_create`, `46h` `block_delete`, `47h` `condense` |
+
+⛔ **Aucun service du BASIC n'est dans la liste.** `alloc`, `eval`, `chknum`, `dec2bin`, `bin2dec` —
+les cinq du §2.1, les plus utiles à une extension — **n'existent qu'à leur adresse de `rom83`**. Ils
+ont bougé d'une révision à l'autre.
+
+> **La règle qui en découle, et elle est nette :**
+> **la couche système est stable, la couche BASIC ne l'est pas.**
+> Un programme qui n'appelle que le device 6 et le système de fichiers tourne sur les trois
+> machines sans rien vérifier. Dès qu'il touche à l'interpréteur, il doit **lire la version de la
+> ROM** en `0FFFF0h`/`0FFFF1h` et refuser ce qu'il ne connaît pas — c'est ce que fait `HISTDRV`,
+> et c'est aussi pourquoi l'éditeur du BASIC range sa touche en `(BP+2Ah)` sur les ROM 5.x-7.x
+> contre `(BP+2Bh)` sur la 8.3 (`03` §3bis).
+
+Les deux listes complètes sont dans `Documentation/` : `rom-callf.txt` (les 280 de `rom83`, avec
+leur nombre d'appelants) et `rom-callf-stables.txt` (les 24, avec leur identification).
+
+⚠️ **Ce que cette mesure ne dit pas** : une routine peut très bien exister dans les trois ROM **à
+des adresses différentes**. Les 24 sont celles qui n'ont pas bougé, pas toutes celles qui existent
+partout. Les retrouver par leur **empreinte de code** plutôt que par leur adresse donnerait une
+liste plus large — et une table de correspondance par version, qui est ce qu'il faudrait pour
+écrire un programme portable qui appelle l'interpréteur.
+
 ---
 
 ## 3. Les routines du référentiel
