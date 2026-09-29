@@ -1,6 +1,6 @@
 # Routines réutilisables — ce qu'on ne devrait plus jamais réécrire
 
-*Rédigé le 2026-09-28 — mis à jour le 2026-09-28*
+*Rédigé le 2026-09-28 — mis à jour le 2026-09-29*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce chapitre rassemble des routines prêtes à l'emploi
 > pour écrire un nouveau programme : celles que la **ROM offre déjà** — et qu'il serait absurde de
@@ -290,7 +290,7 @@ Table complète des 280 lignes : `Documentation/rom-correspondance-3roms.txt`.
 
 #### La sonde qui mettra la table à l'épreuve — `Documentation/T2BIN.ASM`
 
-170 octets. Elle **lit la version** en `0FFFF0h`, **réécrit l'opérande de ses deux `callf`**
+Elle **lit la version** en `0FFFF0h`, **réécrit l'opérande de ses deux `callf`**
 (l'idiome de `MEMCHECK`, déjà employé par le filtre de `XCONSOLE`), puis évalue l'argument du
 `CALL` et le convertit :
 
@@ -312,13 +312,13 @@ ap_chknum:
 Une version inconnue n'est pas devinée : la sonde refuse (état 1). Elle signe ses octets (`0D2h`),
 comme l'exige la leçon des sondes précédentes, et rend toujours la main **retenue claire**.
 
-**L'essai décisif est le dernier** : `CALL &BF000 "1048576"`, soit 2²⁰. `dec2bin` **doit** le
+**L'essai décisif est le dernier** : `CALL &BF000 1048576`, soit 2²⁰. `dec2bin` **doit** le
 refuser avec l'erreur 33 — c'est sa limite mesurée (§2.1). Une adresse fausse ne produirait pas un
 refus propre à cette valeur exacte : **ce test ne vérifie pas seulement que ça marche, il vérifie
 qu'on appelle bien `dec2bin`.**
 
-⛔ **Et ce que la sonde a réellement appris, qui vaut mieux que ce qu'elle cherchait.** Trois
-mesures successives sur PC-E500S (2026-09-28) :
+⛔ **Ce que les trois premiers relevés ont appris, qui vaut mieux que ce qu'ils cherchaient.**
+Mesures sur PC-E500S, 2026-09-28 :
 
 | Essai | Résultat | Ce qu'il apprend |
 |---|---|---|
@@ -329,23 +329,52 @@ mesures successives sur PC-E500S (2026-09-28) :
 **La cause est dans le format du texte tokenisé** : une constante numérique n'y est pas de l'ASCII,
 elle s'écrit **`1Dh` + attributs + exposant + chiffres BCD** (`Codes_BASIC`, et la skill
 `references/basic.md` §4). `chknum` lit du texte de programme et n'y cherche que cette forme-là ;
-les chiffres d'une chaîne littérale ne sont pas de sa grammaire, et son erreur 10 est juste.
+les chiffres d'une **chaîne littérale** ne sont pas de sa grammaire, et son erreur 10 est juste.
 
-> ⛔ **Conclusion, et elle est nette : on ne nourrit pas `chknum` depuis un `CALL &adr "texte"`.**
-> Ces services attendent le **contexte de l'interpréteur** — un cadre poussé, et `X` sur du texte
-> tokenisé. Le seul appelant légitime est une **extension du BASIC** installée par les deux
-> crochets (`12`), c'est-à-dire ce que fait BASEXT.
+#### ⛔ La correction : l'argument s'écrit **sans guillemets**
 
-✅ **Un acquis tout de même, et il est solide** : la mécanique de choix des adresses fonctionne.
-La sonde a lu `8.3`, posé `0EFAD4h` dans l'opérande de son `callf`, appelé, et reçu une erreur
-**propre** — 90 puis 10, jamais un plantage. L'appel à une adresse choisie à l'exécution est donc
-éprouvé ; c'est l'argument qui était mal formé.
+Le 2026-09-28 j'ai conclu de ces trois relevés qu'« on ne nourrit pas `chknum` depuis un
+`CALL &adr` ». **Cette conclusion était trop large, et elle était fausse.** Ce qu'ils établissent,
+c'est qu'on ne le nourrit pas depuis une *chaîne littérale* — parce que le tokeniseur laisse en
+ASCII ce qui est entre guillemets. Hors guillemets, il écrit une vraie constante. Et les deux
+faits qui rendent la route praticable ont été **mesurés dans ces mêmes relevés**, pas supposés :
 
-⚠️ **Une faute de discipline, payée sur la machine.** La première version ne rendait `BP` que sur
-le chemin de succès. Six appels en erreur ont donc laissé `BP` décalé de six fois quinze octets, et
-la machine s'est mise à refuser ce qu'elle acceptait — « `CALL` n'accepte plus les chaînes ».
-**`BP` se rend en ABSOLU, sur tous les chemins**, comme le fait BASEXT (`12` §5) : la sonde sauve
-`BP` à l'entrée et le réécrit à la sortie, quelle qu'elle soit.
+1. `X` pointe dans le **texte de programme tokenisé vivant** — le `3A FE 62` relevé après `"9"` est
+   le `:` et le token de l'instruction suivante ;
+2. `CALL` **laisse intact tout ce qui suit son adresse** — le guillemet était encore là.
+
+Donc :
+
+```basic
+CALL &BF000 "12345"      ' [X] = 22 31 32 33 34 35   -> erreur 10, et c'est normal
+CALL &BF000 12345        ' [X] = 20 1D ...           -> la grammaire de chknum
+```
+
+C'est exactement le mécanisme d'une extension du BASIC : lire ses arguments dans le texte qui suit,
+et rendre `X` là où on s'est arrêté. Le `CALL` sert seulement de point d'entrée.
+
+⚠️ **Faute de discipline, payée sur la machine.** La première version ne rendait `BP` que sur le
+chemin de succès. Six appels en erreur ont donc laissé `BP` décalé de six fois quinze octets, et la
+machine s'est mise à refuser ce qu'elle acceptait — « `CALL` n'accepte plus les chaînes ».
+**`BP` se rend en ABSOLU, sur tous les chemins**, comme le fait BASEXT (`12` §5).
+
+✅ **Un acquis déjà solide, quoi qu'il advienne de la suite** : la mécanique de choix des adresses
+fonctionne. La sonde a lu `8.3`, posé `0EFAD4h` dans l'opérande de son `callf`, appelé, et reçu une
+erreur **propre** — 90 puis 10, jamais un plantage. L'appel à une adresse choisie **à l'exécution**
+est donc éprouvé ; c'est l'argument qui était mal formé.
+
+#### T2BIN v3 — ce qu'elle fait de plus
+
+329 octets. Trois différences avec la v2 :
+
+- **elle saute les espaces** puis **refuse d'emblée** un argument commençant par `022h` (état 4,
+  « argument entre guillemets ») : inutile d'appeler `chknum` pour s'entendre dire non ;
+- **sur succès elle rend `X` tel que `chknum` l'a laissé** — lui seul sait où finit l'expression ;
+- **sur échec elle rebalaye depuis l'original en respectant les longueurs** — `1Dh` vaut 8 ou 13
+  octets selon le bit 0 de son octet d'attributs, `0FEh` en vaut 2, une chaîne court jusqu'à son
+  guillemet fermant. Un balayage naïf chercherait un `03Ah` et buterait sur un octet d'exposant ou
+  un code de token qui lui ressemble : c'est le piège de désynchronisation de la skill §4,
+  rencontré ici pour de bon.
 
 Emploi, sur l'émulateur PC-E500 (7.5) puis sur le PC-E500S (8.3) :
 
@@ -357,7 +386,9 @@ RUN                                    ' T2BIN.BAS : six essais, dont 2^20
 
 Attendu : `0 = 0`, `9 = 9`, `65535 = 65535`, `100*3+45 = 345`, `1048575 = 1048575`, puis
 `1048576 : ETAT 3 ERR 33`. Et pour chacun, l'adresse de `dec2bin` réellement employée s'affiche —
-`EFAD4` sur 8.3, `EFDAE` sur 7.5, `EFD90` sur 5.3.
+`EFAD4` sur 8.3, `EFDAE` sur 7.5, `EFD90` sur 5.3. En cas d'échec, la ligne `RECU` donne les six
+octets présentés à `chknum` : **s'ils commencent par `1D`, l'argument était bien formé** et la
+cause est ailleurs.
 
 ---
 
