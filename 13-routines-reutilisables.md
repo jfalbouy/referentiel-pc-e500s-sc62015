@@ -685,6 +685,55 @@ Attendu sur la 7.3, si la prédiction du décalage est juste : `EVAL EF533 x1 : 
 > ce qui ne bouge pas. Elle coûte quelques secondes une fois, au chargement du pilote, et elle
 > **échoue proprement** quand elle ne trouve pas : c'est exactement ce qui manquait à `T2BIN`.
 
+
+#### ✅ La recherche par empreinte, éprouvée sur la 7.3 — et la prédiction vérifiée
+
+Essai du 2026-09-29, émulateur PC-E500, `T2FIND` :
+
+```
+VUE 7 . 3   ETAT 8
+EVAL EF533 x 1  :  4 37 F5 7
+D2B  EFD99 x 1  :  4 9D FD 7
+```
+
+**Les deux adresses prédites, à l'octet près.** Et les deux vignettes sont bien formées : `04 37 F5`
+appelle `0F537h`, soit `0EF533h + 4` ; `04 9D FD` appelle `0FD9Dh`, soit `0EFD99h + 4`. Le `x1` dit
+de surcroît que chaque empreinte n'apparaît **qu'une fois** dans les 256 Ko : elle est restée
+discriminante sur une quatrième révision, qui n'avait pas servi à la construire.
+
+La table de correspondance gagne donc une colonne — **mesurée**, pas déduite :
+
+| Service | 8.3 | 7.5 | **7.3** | 5.3 |
+|---|---|---|---|---|
+| `eval` | `0EF26Eh` | `0EF548h` | **`0EF533h`** | `0EF52Dh` |
+| `dec2bin` | `0EFAD4h` | `0EFDAEh` | **`0EFD99h`** | `0EFD90h` |
+
+Le décalage 7.5 → 7.3 est de **−21 octets** pour les deux services, ce qui confirme après coup la
+lecture faite des quatre octets relevés par `T2DRY`.
+
+#### T2BIN v5 — la sonde cherche elle-même
+
+630 octets. Elle ne consulte plus aucune table : à son premier appel elle **balaie la ROM**, garde
+les deux adresses, et les **revalide** à chaque appel suivant — signature, version, et les deux
+vignettes toujours à leur place — pour ne balayer qu'une fois.
+
+⚠️ **Un détail d'assembleur qui vaut d'être noté** : `cmp a,[adresse]` **n'existe pas** dans
+`xasm2026-4` (ni `cmp a,(n)`). Pour comparer `A` à un octet de mémoire externe, la sonde **réécrit
+l'opérande immédiat** du `cmp` — le même idiome que pour ses deux `callf` :
+
+```asm
+        mv      a,[rom_majeure]
+        mv      [!cv_maj+1],a           ; poser l'octet attendu dans l'operande
+        mv      a,[res_ver]
+cv_maj: cmp     a,000H                  ; OPERANDE REECRIT
+        jrnz    rebal
+```
+
+⛔ **Et une chausse-trape côté BASIC, évitée de justesse** : le programme de lecture ne doit **pas**
+effacer la signature après l'avoir lue, comme le faisaient les versions précédentes — c'est elle
+qui dit à la sonde que son cache d'adresses est bon. Il marque désormais l'**état**. Sans cela,
+chaque appel rebalayait 256 Ko.
+
 #### Ce que la sonde rend maintenant possible
 
 La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
