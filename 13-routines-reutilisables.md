@@ -278,9 +278,10 @@ ces adresses on lit bien `call <cible>` suivi de `retf`.
 > d'adresses** — trois `equ` conditionnels, et `BASEXT` tournerait sur un PC-E500 comme sur un
 > PC-E500S.
 >
-> ⚠️ Mais la table n'a **pas été éprouvée sur machine** : elle est établie par identité de code,
-> ce qui est solide, pas par exécution. Avant de la publier comme acquise, il faudrait appeler
-> `dec2bin` à `0EFDAEh` sur une vraie 7.5 et voir ce qui revient.
+> ✅ **Éprouvée le 2026-09-29**, et par une voie meilleure que prévu : `eval` et `dec2bin` ont été
+> appelés sur un PC-E500 porteur d'une ROM **7.3** — une révision dont nous n'avons aucun dump —
+> avec des adresses **trouvées par empreinte de code à l'exécution**. Voir la fin de cette section.
+> La table reste utile comme **trace**, elle n'est plus le moyen.
 
 ⚠️ **Les 67 à 75 routines non retrouvées** ne sont pas forcément absentes : une empreinte trop
 courte (un trampoline dont la cible bouge aussi), une routine réellement réécrite, ou un décalage
@@ -767,19 +768,69 @@ connue à l'avance. Le sous-programme d'écriture la calcule donc et décale d'u
 ⚠️ **L'espace se met en TÊTE, jamais en fin** : la machine supprime l'espace terminale quand elle
 relit une ligne, et le correctif disparaîtrait au premier aller-retour.
 
-#### Ce que la sonde rend maintenant possible
+#### ✅ L'épreuve complète : `eval` et `dec2bin` appelés sur une ROM dont nous n'avons aucun dump
 
-La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
-— l'essai confirme la sonde, pas encore la table. **L'épreuve qui compte est le même `RUN` sur
-l'émulateur PC-E500 (7.5)** : la sonde y lira `7.5`, posera d'elle-même `0EF548h` (`eval`) et
-`0EFDAEh` (`dec2bin`), et ces deux adresses-là ne viennent d'aucune mesure — seulement de
-l'identité de code. Si `1048575` passe et que `1048576` rend l'erreur 33, **la correspondance
-croisée est validée par exécution**, et une extension du BASIC portable sur les trois machines
-cesse d'être une conjecture.
+`F:T2BINRES.TXT`, émulateur PC-E500, 2026-09-29 — le fichier rendu tel quel :
 
-⚠️ La ligne `chknum` de la table (`0EFECDh` en 7.5, `0EFEAFh` en 5.3) **reste sans épreuve** :
-depuis la v4 la sonde ne l'appelle plus. C'est le prix d'avoir choisi le bon service ; il se
-paiera par une sonde jumelle, ou par le premier mot-clé calqué sur `PEEK` qu'on portera.
+```
+T2BIN V5 -- ROM 7. 3
+0 = 0
+ADRESSES EN CACHE
+EVAL EF533 X 1
+  VIGNETTE 4 37 F5 7
+D2B  EFD99 X 1
+  VIGNETTE 4 9D FD 7
+9 = 9
+65535 = 65535
+100*3+45 = 345
+1048575 = 1048575
+1048576 : ETAT 3 ERR 33
+  RECU 1D 0 6 10 48 57
+```
+
+**Cinq résultats d'un coup, et le dernier est le plus important.**
+
+1. ✅ **Les six essais passent sur la 7.3**, expression composée comprise (`100*3+45 = 345`).
+2. ✅ **`1048576` est refusé avec l'erreur 33** : la frontière tombe exactement sur 2²⁰, la limite
+   mesurée de `dec2bin` au §2.1. C'est bien lui qu'on appelle, à une adresse que personne n'avait
+   écrite nulle part.
+3. ✅ **Les adresses ont été trouvées par empreinte de code**, pas lues dans une table :
+   `0EF533h` et `0EFD99h`, vignettes `04 37 F5 07` et `04 9D FD 07`, **une seule occurrence
+   chacune** dans les 256 Ko.
+4. ✅ **Le cache et sa revalidation fonctionnent** — `ADRESSES EN CACHE` : la sonde a retrouvé la
+   signature, la version et les deux vignettes en place, et n'a pas rebalayé.
+5. ✅ **La sortie sur `F:` n'est pas tronquée** : le fichier finit sur son `1Ah` d'EOF après la
+   dernière ligne, garde-fou compris.
+
+> ⛔ **Ce que cela établit, et qui dépasse la sonde.** Nous avons appelé deux services du BASIC sur
+> une machine dont **nous ne possédons pas la ROM**, sans table d'adresses, sans deviner, et sans
+> la bloquer. La conjecture du §2.7 — « une extension du BASIC portable sur les trois machines » —
+> est non seulement vraie, mais **trop timide** : la recherche par empreinte ne connaît pas de
+> liste de révisions. Elle connaît du code, et elle **échoue proprement** quand elle ne le trouve
+> pas.
+>
+> Le coût est une poignée de secondes **une seule fois**, à l'installation d'un pilote. C'est le
+> prix d'un programme qui ne se trompera pas de machine.
+
+⚠️ **Ce que cela n'établit pas.** L'empreinte a été construite sur trois ROM et vérifiée sur une
+quatrième : c'est un échantillon, pas une preuve. Une révision où le corps d'`eval` différerait de
+ses six premiers octets ne serait pas trouvée — et la sonde le **dirait** (`x0`, état 1) au lieu de
+sauter dans le vide. C'est toute la différence avec la v4.
+
+⚠️ **La ligne `chknum` de la table reste sans épreuve** (`0EFECDh` en 7.5, `0EFEAFh` en 5.3) :
+depuis la v4 la sonde ne l'appelle plus. Son empreinte se construirait de la même façon ; il
+faudrait une sonde jumelle, ou le premier mot-clé calqué sur `PEEK` qu'on portera.
+
+#### La table de correspondance, après l'épreuve
+
+| Service | 8.3 | 7.5 | 7.3 | 5.3 | Établie par |
+|---|---|---|---|---|---|
+| `eval` | `0EF26Eh` | `0EF548h` | `0EF533h` | `0EF52Dh` | ✅ empreinte, **exécutée** sur 8.3 et 7.3 |
+| `dec2bin` | `0EFAD4h` | `0EFDAEh` | `0EFD99h` | `0EFD90h` | ✅ idem |
+| `chknum` | `0EFBF3h` | `0EFECDh` | — | `0EFEAFh` | ⚙️ identité de code, exécutée sur 8.3 seulement |
+
+**La table n'est plus le moyen : elle est la trace.** Un programme qui a besoin de ces adresses les
+cherche ; la table sert à vérifier qu'il a trouvé ce qu'il fallait.
 
 ---
 
