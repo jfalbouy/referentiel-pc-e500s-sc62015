@@ -734,6 +734,39 @@ effacer la signature après l'avoir lue, comme le faisaient les versions précé
 qui dit à la sonde que son cache d'adresses est bon. Il marque désormais l'**état**. Sans cela,
 chaque appel rebalayait 256 Ko.
 
+
+#### Les trois sondes écrivent leur relevé sur `F:`
+
+Relire un écran de 4 lignes à la loupe est une source d'erreur en soi — et le relevé se perd au
+`RESET` suivant. Les trois programmes de conduite écrivent donc **à l'écran *et* dans un fichier**,
+l'idiome des sondes `T48x` (`BASEXT-DRV/sondes/T484.BAS`) :
+
+| Sonde | Fichier |
+|---|---|
+| `T2BIN.BAS` | `F:T2BINRES.TXT` |
+| `T2FIND.BAS` | `F:T2FINDRE.TXT` |
+| `T2DRY.BAS` | `F:T2DRYRES.TXT` |
+
+```basic
+50 OPEN "F:T2BINRES.TXT" FOR OUTPUT AS #1
+...
+940 PRINT L$:PRINT #1,L$:RETURN
+```
+
+⛔ **Et un garde-fou, parce que ces fichiers passent par le CE-140F.** Le défaut mesuré le
+2026-08-27 est là : **une ligne dont la somme des caractères vaut `03h`** fait `1Ah` une fois `CR`
+et `LF` ajoutés — le marqueur de fin de fichier — et **le fichier est tronqué là, sans aucune
+erreur signalée**. Les lignes écrites ici portent des valeurs mesurées : leur somme n'est pas
+connue à l'avance. Le sous-programme d'écriture la calcule donc et décale d'une espace :
+
+```basic
+920 S9=0:FOR I9=1 TO LEN (L$):S9=S9+ASC (MID$ (L$,I9,1)):NEXT I9
+930 IF S9-INT (S9/256)*256=3 THEN L$=" "+L$
+```
+
+⚠️ **L'espace se met en TÊTE, jamais en fin** : la machine supprime l'espace terminale quand elle
+relit une ligne, et le correctif disparaîtrait au premier aller-retour.
+
 #### Ce que la sonde rend maintenant possible
 
 La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
