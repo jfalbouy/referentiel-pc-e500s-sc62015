@@ -288,7 +288,7 @@ d'instruction suffisent à la manquer. La table dit ce qu'elle a trouvé, pas ce
 
 Table complète des 280 lignes : `Documentation/rom-correspondance-3roms.txt`.
 
-#### La sonde qui mettra la table à l'épreuve — `Documentation/T2BIN.ASM`
+#### La sonde qui met la table à l'épreuve — `Documentation/T2BIN.ASM` — ✅ éprouvée
 
 Elle **lit la version** en `0FFFF0h`, **réécrit l'opérande de ses deux `callf`**
 (l'idiome de `MEMCHECK`, déjà employé par le filtre de `XCONSOLE`), puis évalue l'argument du
@@ -384,21 +384,29 @@ LOAD M "X:T2BIN.OBJ"
 RUN                                    ' T2BIN.BAS : six essais, dont 2^20
 ```
 
-#### ✅ Mesure sur PC-E500S, 2026-09-29 — la route est éprouvée
+#### ✅ Mesure sur PC-E500S, 2026-09-29 — la sonde est éprouvée
+
+**T2BIN v4**, six essais sur six, `ROM 8.3` :
 
 | Essai | Rendu |
 |---|---|
-| `CALL &BF000 0` | `0 = 0 VIA EFAD4` |
-| `CALL &BF000 9` | `9 = 9 VIA EFAD4` |
-| `CALL &BF000 65535` | `65535 = 65535 VIA EFAD4` |
-| `CALL &BF000 1048575` | `1048575 = 1048575 VIA EFAD4` |
-| `CALL &BF000 1048576` | `ETAT 3 ERR 33` — ✅ **`dec2bin` refuse 2²⁰** |
-| `CALL &BF000 "100*3+45"` | `ARGUMENT ENTRE GUILLEMETS`, `RECU 22 31 30 30 2A 33` |
+| `CALL &BF000 0` | `0 = 0 VIA EF26E EFAD4` |
+| `CALL &BF000 9` | `9 = 9 VIA EF26E EFAD4` |
+| `CALL &BF000 65535` | `65535 = 65535 VIA EF26E EFAD4` |
+| `CALL &BF000 100*3+45` | `345` — ✅ **l'expression complète, opérateurs compris** |
+| `CALL &BF000 1048575` | `1048575 = 1048575 VIA EF26E EFAD4` |
+| `CALL &BF000 1048576` | `ETAT 3 ERR 33`, `RECU 1D 0 6 10 48 57` — ✅ **`dec2bin` refuse 2²⁰** |
+
+Relevés intermédiaires de la mise au point, conservés parce qu'ils portent les contrats :
+`CALL &BF000 "100*3+45"` → `ARGUMENT ENTRE GUILLEMETS`, `RECU 22 31 30 30 2A 33` (la chaîne
+littérale reste de l'ASCII, §ci-dessus) ; et, en v3, `CALL &BF000 100*3+45` → `Syntax error`
+(`chknum` s'arrêtait sur le `*`).
 
 **Trois choses sont acquises d'un coup.**
 
-1. ✅ **`chknum` et `dec2bin` s'appellent depuis un `CALL &adr`**, à la seule condition que
-   l'argument soit écrit **sans guillemets**. La correction ci-dessus est confirmée sur machine.
+1. ✅ **`eval` et `dec2bin` s'appellent depuis un `CALL &adr`**, à la seule condition que
+   l'argument soit écrit **sans guillemets**. La correction ci-dessus est confirmée sur machine —
+   et `345` prouve que l'expression est évaluée en entier, priorité des opérateurs comprise.
 2. ✅ **C'est bien `dec2bin` qu'on appelle, et pas une adresse voisine qui marcherait par hasard** :
    `1048575` passe, `1048576` est refusé avec l'erreur **33**. Le refus tombe exactement sur 2²⁰,
    la limite mesurée au §2.1 — aucune autre routine ne produirait cette frontière-là.
