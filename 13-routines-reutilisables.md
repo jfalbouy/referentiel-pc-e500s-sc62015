@@ -376,7 +376,7 @@ est donc éprouvé ; c'est l'argument qui était mal formé.
   un code de token qui lui ressemble : c'est le piège de désynchronisation de la skill §4,
   rencontré ici pour de bon.
 
-Emploi, sur l'émulateur PC-E500 (7.5) puis sur le PC-E500S (8.3) :
+Emploi, sur le PC-E500S (8.3) puis sur l'émulateur PC-E500 (7.5) :
 
 ```basic
 POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
@@ -384,11 +384,61 @@ LOAD M "X:T2BIN.OBJ"
 RUN                                    ' T2BIN.BAS : six essais, dont 2^20
 ```
 
-Attendu : `0 = 0`, `9 = 9`, `65535 = 65535`, `100*3+45 = 345`, `1048575 = 1048575`, puis
-`1048576 : ETAT 3 ERR 33`. Et pour chacun, l'adresse de `dec2bin` réellement employée s'affiche —
-`EFAD4` sur 8.3, `EFDAE` sur 7.5, `EFD90` sur 5.3. En cas d'échec, la ligne `RECU` donne les six
-octets présentés à `chknum` : **s'ils commencent par `1D`, l'argument était bien formé** et la
-cause est ailleurs.
+#### ✅ Mesure sur PC-E500S, 2026-09-29 — la route est éprouvée
+
+| Essai | Rendu |
+|---|---|
+| `CALL &BF000 0` | `0 = 0 VIA EFAD4` |
+| `CALL &BF000 9` | `9 = 9 VIA EFAD4` |
+| `CALL &BF000 65535` | `65535 = 65535 VIA EFAD4` |
+| `CALL &BF000 1048575` | `1048575 = 1048575 VIA EFAD4` |
+| `CALL &BF000 1048576` | `ETAT 3 ERR 33` — ✅ **`dec2bin` refuse 2²⁰** |
+| `CALL &BF000 "100*3+45"` | `ARGUMENT ENTRE GUILLEMETS`, `RECU 22 31 30 30 2A 33` |
+
+**Trois choses sont acquises d'un coup.**
+
+1. ✅ **`chknum` et `dec2bin` s'appellent depuis un `CALL &adr`**, à la seule condition que
+   l'argument soit écrit **sans guillemets**. La correction ci-dessus est confirmée sur machine.
+2. ✅ **C'est bien `dec2bin` qu'on appelle, et pas une adresse voisine qui marcherait par hasard** :
+   `1048575` passe, `1048576` est refusé avec l'erreur **33**. Le refus tombe exactement sur 2²⁰,
+   la limite mesurée au §2.1 — aucune autre routine ne produirait cette frontière-là.
+3. ✅ **Le format de la constante tokenisée est vérifié à l'œil**, sur le relevé `RECU` du dernier
+   essai :
+
+   ```
+   1D  00  06  10 48 57 …
+   |   |   |   +-- BCD : 1 048 576
+   |   |   +------ exposant 10^6
+   |   +---------- attributs : bit 3 = 0 (positif), bit 0 = 0 (simple precision)
+   +-------------- constante reelle
+   ```
+
+   Soit `1,048576 × 10⁶`. La table de la skill `references/basic.md` §4 se lit ici en clair.
+
+⚠️ **Un cas résiste : l'expression composée.** `CALL &BF000 100*3+45` rend `Syntax error in 80`
+**avant tout affichage** — la sonde n'a donc pas eu l'occasion d'écrire son état, et l'interpréteur
+a repris la ligne au mauvais endroit. Les constantes isolées passent, l'expression non : `X` tel
+que `chknum` le laisse ne désigne pas, dans ce cas, l'octet où le BASIC doit reprendre. La mesure
+qui tranche est la comparaison de `X` à l'entrée (`0BFBF3h`) et à la sortie de `chknum`
+(`0BFBF6h`), à relever **en mode direct après l'erreur** — la zone survit :
+
+```basic
+PRINT HEX$ (PEEK &BFBF3+PEEK &BFBF4*256+PEEK &BFBF5*65536);" ";
+PRINT HEX$ (PEEK &BFBF6+PEEK &BFBF7*256+PEEK &BFBF8*65536)
+```
+
+⛔ **À ne pas contourner en rendant `X` par balayage** : ce serait remplacer une mesure par une
+supposition. `chknum` consomme le texte ; savoir **où il s'arrête** fait partie de son contrat, et
+c'est ce contrat qu'on est en train d'écrire.
+
+#### Ce que la sonde rend maintenant possible
+
+La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
+— l'essai confirme la sonde, pas encore la table. **L'épreuve qui compte est le même `RUN` sur
+l'émulateur PC-E500 (7.5)** : la sonde y lira `7.5`, posera d'elle-même `0EFECDh` et `0EFDAEh`, et
+ces deux adresses-là ne viennent d'aucune mesure — seulement de l'identité de code. Si `1048575`
+passe et que `1048576` rend l'erreur 33, **la correspondance croisée est validée par exécution**,
+et une extension du BASIC portable sur les trois machines cesse d'être une conjecture.
 
 ---
 
