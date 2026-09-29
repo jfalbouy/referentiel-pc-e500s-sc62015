@@ -821,13 +821,133 @@ sauter dans le vide. C'est toute la différence avec la v4.
 depuis la v4 la sonde ne l'appelle plus. Son empreinte se construirait de la même façon ; il
 faudrait une sonde jumelle, ou le premier mot-clé calqué sur `PEEK` qu'on portera.
 
+##### ✅ Et le même objet sur PC-E500S (8.3) — `F:T2BINRES.TXT`, même jour
+
+```
+T2BIN V5 -- ROM 8. 3
+0 = 0
+BALAYAGE FAIT A CET APPEL
+EVAL EF26E X 1
+  VIGNETTE 4 72 F2 7
+D2B  EFAD4 X 1
+  VIGNETTE 4 D8 FA 7
+9 = 9
+65535 = 65535
+100*3+45 = 345
+1048575 = 1048575
+1048576 : ETAT 3 ERR 33
+  RECU 1D 0 6 10 48 57
+```
+
+⛔ **C'est la contre-épreuve, et elle vaut mieux que l'essai sur la 7.3.** Le balayage retrouve
+`0EF26Eh` et `0EFAD4h` — **exactement les deux adresses que `BASEXT` avait mesurées
+indépendamment**, par une tout autre voie (les mots-clés `LPEEK`, `WPEEK`, `MOD` qui tournent sur
+machine, `12` §5). La recherche par empreinte est donc confrontée à une vérité de terrain établie
+ailleurs, et elle tombe dessus.
+
+✅ **`BALAYAGE FAIT A CET APPEL`** : cet essai-ci a réellement exercé le chemin de balayage, ce que
+l'essai sur la 7.3 n'avait pas fait — il avait trouvé ses adresses en cache, laissées par un
+passage antérieur. Les deux chemins sont donc éprouvés, chacun sur une machine.
+
+**Un même objet de 630 octets, sans une ligne de différence, tourne sur les deux machines** : un
+PC-E500S en 8.3 et un PC-E500 en 7.3 dont nous n'avons pas la ROM. C'était l'objectif énoncé plus
+haut ; il est atteint, et par un moyen plus solide que celui qui avait été envisagé.
+
+##### ✅ Et sur PC-E550 (7.5) — la colonne qui n'avait jamais été exécutée
+
+```
+T2BIN V5 -- ROM 7. 5
+0 = 0
+BALAYAGE FAIT A CET APPEL
+EVAL EF548 X 1
+  VIGNETTE 4 4C F5 7
+D2B  EFDAE X 1
+  VIGNETTE 4 B2 FD 7
+9 = 9
+65535 = 65535
+100*3+45 = 345
+1048575 = 1048575
+1048576 : ETAT 3 ERR 33
+  RECU 1D 0 6 10 48 57
+```
+
+**C'est la question posée au début de cette section, et elle est close.** Il y était écrit : « il
+faudrait appeler `dec2bin` à `0EFDAEh` sur une vraie 7.5 et voir ce qui revient ». Voilà ce qui
+revient — et deux fois plutôt qu'une, car l'épreuve est double :
+
+1. ✅ **Le balayage trouve `0EF548h` et `0EFDAEh`**, les adresses que la table avait déduites par
+   identité de code, **jamais exécutées jusqu'ici** ;
+2. ✅ **Les vignettes rendues par la machine sont `04 4C F5 07` et `04 B2 FD 07`** — **octet pour
+   octet** ce que porte notre `rom75.bin` à ces deux adresses. Le dump et la machine disent la
+   même chose.
+
+Et les six essais passent comme ailleurs, `100*3+45 = 345` compris.
+
+##### ✅ Et sur PC-U6000 (8.4) — une cinquième révision, sans dump elle non plus
+
+```
+T2BIN V5 -- ROM 8. 4
+0 = 0
+BALAYAGE FAIT A CET APPEL
+EVAL EF2AE X 1
+  VIGNETTE 4 B2 F2 7
+D2B  EFB13 X 1
+  VIGNETTE 4 17 FB 7
+9 = 9
+65535 = 65535
+100*3+45 = 345
+1048575 = 1048575
+1048576 : ETAT 3 ERR 33
+  RECU 1D 0 6 10 48 57
+```
+
+`0EF2AEh` et `0EFB13h`, vignettes bien formées (`04 B2 F2` appelle `0F2B2h` = `0EF2AEh + 4`), une
+seule occurrence chacune, et les six essais passent.
+
+⛔ **Et c'est l'essai qui condamne définitivement l'extrapolation.** La 7.3 s'était laissé décrire
+par un **décalage uniforme** de −21 octets pour les deux services, ce qui donnait envie de
+généraliser. La 8.4 ne se laisse pas faire :
+
+| Service | 8.3 | 8.4 | Écart |
+|---|---|---|---|
+| `eval` | `0EF26Eh` | `0EF2AEh` | **+64** |
+| `dec2bin` | `0EFAD4h` | `0EFB13h` | **+63** |
+
+**Deux écarts différents dans la même ROM.** Une extrapolation à partir d'un seul service aurait
+donc placé l'autre à un octet près — c'est-à-dire au milieu d'une instruction, et la machine se
+serait bloquée comme le 2026-09-29. Aucun raccourci arithmétique ne remplace la recherche.
+
+##### Où l'on sait maintenant quelle machine porte quelle ROM
+
+| Machine | ROM | Dump en notre possession | `eval` | `dec2bin` |
+|---|---|---|---|---|
+| PC-U6000 | **8.4** | ⛔ aucun | `0EF2AEh` | `0EFB13h` |
+| PC-E500S | **8.3** | ✅ `rom83.bin` | `0EF26Eh` | `0EFAD4h` |
+| PC-E550 | **7.5** | ✅ `rom75.bin` | `0EF548h` | `0EFDAEh` |
+| PC-E500 | **7.3** | ⛔ aucun | `0EF533h` | `0EFD99h` |
+| — | 5.3 | ✅ `rom53.bin` | `0EF52Dh` | `0EFD90h` |
+
+⚠️ **Ni la 7.3 ni la 8.4 ne sont des curiosités** : la première est la révision du PC-E500 de
+première génération, la seconde celle du PC-U6000 — que `HISTDRV` avait justement **refusée** faute
+de l'avoir mesurée (`12` §17). Ce sont les deux dont nous n'avons pas le dump, et ce sont
+exactement celles que la table n'aurait jamais pu couvrir.
+
+Les quatre relevés sont conservés : `Documentation/T2BINRES-84.TXT`, `-83`, `-75`, `-73`.
+
 #### La table de correspondance, après l'épreuve
 
-| Service | 8.3 | 7.5 | 7.3 | 5.3 | Établie par |
-|---|---|---|---|---|---|
-| `eval` | `0EF26Eh` | `0EF548h` | `0EF533h` | `0EF52Dh` | ✅ empreinte, **exécutée** sur 8.3 et 7.3 |
-| `dec2bin` | `0EFAD4h` | `0EFDAEh` | `0EFD99h` | `0EFD90h` | ✅ idem |
-| `chknum` | `0EFBF3h` | `0EFECDh` | — | `0EFEAFh` | ⚙️ identité de code, exécutée sur 8.3 seulement |
+| Service | 8.4 | 8.3 | 7.5 | 7.3 | 5.3 | Établie par |
+|---|---|---|---|---|---|---|
+| `eval` | `0EF2AEh` | `0EF26Eh` | `0EF548h` | `0EF533h` | `0EF52Dh` | ✅ empreinte, **balayage exécuté** sur 8.4, 8.3, 7.5 et 7.3 |
+| `dec2bin` | `0EFB13h` | `0EFAD4h` | `0EFDAEh` | `0EFD99h` | `0EFD90h` | ✅ idem |
+| `chknum` | — | `0EFBF3h` | `0EFECDh` | — | `0EFEAFh` | ⚙️ identité de code, exécutée sur 8.3 seulement |
+
+⚠️ La colonne **5.3** reste la seule jamais exécutée : nous en avons le dump, pas la machine.
+
+> **Le bilan de la section, en une phrase.** Un objet de 630 octets, sans une ligne de différence,
+> a appelé `eval` et `dec2bin` sur **quatre révisions de ROM** — dont **deux dont nous ne possédons
+> aucun dump** — en trouvant leurs adresses lui-même, et il n'a bloqué aucune machine. La table
+> n'est plus le moyen : elle est la trace.
 
 **La table n'est plus le moyen : elle est la trace.** Un programme qui a besoin de ces adresses les
 cherche ; la table sert à vérifier qu'il a trouvé ce qu'il fallait.
