@@ -415,30 +415,67 @@ RUN                                    ' T2BIN.BAS : six essais, dont 2^20
 
    Soit `1,048576 × 10⁶`. La table de la skill `references/basic.md` §4 se lit ici en clair.
 
-⚠️ **Un cas résiste : l'expression composée.** `CALL &BF000 100*3+45` rend `Syntax error in 80`
-**avant tout affichage** — la sonde n'a donc pas eu l'occasion d'écrire son état, et l'interpréteur
-a repris la ligne au mauvais endroit. Les constantes isolées passent, l'expression non : `X` tel
-que `chknum` le laisse ne désigne pas, dans ce cas, l'octet où le BASIC doit reprendre. La mesure
-qui tranche est la comparaison de `X` à l'entrée (`0BFBF3h`) et à la sortie de `chknum`
-(`0BFBF6h`), à relever **en mode direct après l'erreur** — la zone survit :
+#### ⛔ Le cas qui résistait : `chknum` ne lit **qu'un terme**
 
-```basic
-PRINT HEX$ (PEEK &BFBF3+PEEK &BFBF4*256+PEEK &BFBF5*65536);" ";
-PRINT HEX$ (PEEK &BFBF6+PEEK &BFBF7*256+PEEK &BFBF8*65536)
+`CALL &BF000 100*3+45` rendait `Syntax error` **avant tout affichage**, alors que les constantes
+isolées passaient. La cause n'était pas à chercher : elle était déjà écrite, et déjà payée une
+fois, dans `BASEXT.ASM` (`12` §5) —
+
+> `chknum` (`0EFBF3h`) ne lit qu'**UN TERME** : un nombre, une variable, un appel de fonction, ou
+> une expression entre parenthèses — mais il **s'arrête au premier OPERATEUR**. C'est ce
+> qu'emploie `PEEK` (`0F5F9Ch`), et c'est pourquoi `PEEK &BFD1C*&100` se lit `(PEEK &BFD1C)*&100`.
+> `eval` (`0EF26Eh`) évalue une **EXPRESSION COMPLETE**, opérateurs compris.
+>
+> *Mesure d'alors : `MOD (17,5)` et `MOD (A,B)` passaient, `MOD (A+1,B)` et `MOD (I*3571,997)`
+> rendaient une erreur — `chknum` lisait « A », puis butait sur le « + ».*
+
+`chknum` avait donc consommé `100` et rendu `X` sur le `2Ah` — que l'interpréteur lit comme
+l'ouverture d'une **référence de label**, d'où la syntaxe refusée. Le contrat de `chknum` sur `X`
+est juste ; c'est la sonde qui appelait le mauvais service.
+
+**T2BIN v4 appelle `eval`**, suivi du test de type que font les appelants de la ROM
+(`0F5F6Bh`) puisque `eval` ne le fait pas lui-même :
+
+```asm
+ap_eval:
+        callf   000000H         ; 0EF26Eh sur 8.3, reecrit a l'execution
+        jrc     ec_eval
+        test    (BP+0),080H     ; bit 7 : c'est une chaine -> etat 5
+        jrnz    ec_type
+        mv      [!sv_x1],x      ; X tel qu'eval l'a laisse
+ap_dec2bin:
+        callf   000000H
 ```
 
-⛔ **À ne pas contourner en rendant `X` par balayage** : ce serait remplacer une mesure par une
-supposition. `chknum` consomme le texte ; savoir **où il s'arrête** fait partie de son contrat, et
-c'est ce contrat qu'on est en train d'écrire.
+#### Le mot-clé `EVAL` du BASIC ne prend qu'une **chaîne**
+
+Mesure en mode direct, 2026-09-29 :
+
+| Frappé | Rendu |
+|---|---|
+| `A$="100*3+45"` puis `EVAL A$` | `345` |
+| `EVAL 100*3+45` | `Type mismatch` |
+| `EVAL(100*3+45)` | `Type mismatch` |
+
+⛔ **Ne pas confondre les deux.** Le mot-clé `EVAL` du BASIC attend une **chaîne de caractères**,
+qu'il fait tokeniser puis évaluer. Le service `eval` de la ROM (`0EF26Eh`) attend au contraire du
+**texte de programme déjà tokenisé** désigné par `X`. Même nom, contrats opposés — et c'est le
+second que `BASEXT` et `T2BIN` appellent. Le premier est la voie BASIC pour évaluer une expression
+construite à l'exécution ; il n'a pas d'équivalent en machine sans passer par le tokeniseur.
 
 #### Ce que la sonde rend maintenant possible
 
 La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
 — l'essai confirme la sonde, pas encore la table. **L'épreuve qui compte est le même `RUN` sur
-l'émulateur PC-E500 (7.5)** : la sonde y lira `7.5`, posera d'elle-même `0EFECDh` et `0EFDAEh`, et
-ces deux adresses-là ne viennent d'aucune mesure — seulement de l'identité de code. Si `1048575`
-passe et que `1048576` rend l'erreur 33, **la correspondance croisée est validée par exécution**,
-et une extension du BASIC portable sur les trois machines cesse d'être une conjecture.
+l'émulateur PC-E500 (7.5)** : la sonde y lira `7.5`, posera d'elle-même `0EF548h` (`eval`) et
+`0EFDAEh` (`dec2bin`), et ces deux adresses-là ne viennent d'aucune mesure — seulement de
+l'identité de code. Si `1048575` passe et que `1048576` rend l'erreur 33, **la correspondance
+croisée est validée par exécution**, et une extension du BASIC portable sur les trois machines
+cesse d'être une conjecture.
+
+⚠️ La ligne `chknum` de la table (`0EFECDh` en 7.5, `0EFEAFh` en 5.3) **reste sans épreuve** :
+depuis la v4 la sonde ne l'appelle plus. C'est le prix d'avoir choisi le bon service ; il se
+paiera par une sonde jumelle, ou par le premier mot-clé calqué sur `PEEK` qu'on portera.
 
 ---
 
