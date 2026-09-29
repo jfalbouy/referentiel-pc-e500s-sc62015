@@ -917,6 +917,43 @@ généraliser. La 8.4 ne se laisse pas faire :
 donc placé l'autre à un octet près — c'est-à-dire au milieu d'une instruction, et la machine se
 serait bloquée comme le 2026-09-29. Aucun raccourci arithmétique ne remplace la recherche.
 
+##### ⛔ Et sur PC-E500JP (7.2) — l'argument se referme par l'autre bout
+
+```
+T2BIN V5 -- ROM 7. 2
+0 = 0
+BALAYAGE FAIT A CET APPEL
+EVAL EF548 X 1
+  VIGNETTE 4 4C F5 7
+D2B  EFDAE X 1
+  VIGNETTE 4 B2 FD 7
+...
+1048576 : ETAT 3 ERR 33
+```
+
+Une **sixième** révision — et elle porte `eval` et `dec2bin` **aux adresses de la 7.5**,
+`0EF548h` et `0EFDAEh`, avec les vignettes `04 4C F5 07` et `04 B2 FD 07`, celles-là mêmes que
+notre `rom75.bin`. ⚠️ Cela dit que **ces deux points de code coïncident**, pas que les deux ROM
+soient identiques : nous n'avons mesuré que deux adresses.
+
+**Les deux façons dont une table de versions échoue sont maintenant mesurées, et elles sont
+opposées :**
+
+| Révision | Ce que fait une table indexée par la version | Ce qui arrive |
+|---|---|---|
+| **7.3** | même chiffre majeur que 7.5 → **devine** ses adresses | ⛔ `callf` au milieu d'une instruction, **machine bloquée** (mesuré) |
+| **7.2** | version absente de la table → **refuse** | ⛔ une machine parfaitement utilisable est écartée, alors que les adresses de la 7.5 y marchent |
+
+> ⛔ **Le numéro de version n'est ni suffisant ni nécessaire.** Pas suffisant : deux ROM qui le
+> partagent presque peuvent différer (7.3 contre 7.5). Pas nécessaire : deux ROM qui l'ont
+> différent peuvent coïncider là où ça compte (7.2 et 7.5). Toute discipline fondée sur lui est
+> donc fautive dans un sens ou dans l'autre — trop laxiste, elle plante ; trop stricte, elle
+> refuse ce qui marche. **Seul le code dit la vérité sur le code.**
+
+C'est aussi la correction, mesurée, de ce que `HISTDRV` fait encore : il adapte par **intervalle**
+(« 5.x–7.x contre 8.x ») et refuse le reste. Cela l'a protégé du plantage — mais cela lui aurait
+fait refuser le PC-U6000 en 8.4, qui fonctionne.
+
 ##### Où l'on sait maintenant quelle machine porte quelle ROM
 
 | Machine | ROM | Dump en notre possession | `eval` | `dec2bin` |
@@ -926,6 +963,7 @@ serait bloquée comme le 2026-09-29. Aucun raccourci arithmétique ne remplace l
 | PC-E550 | **7.5** | ✅ `rom75.bin` | `0EF548h` | `0EFDAEh` |
 | **PC-E500-BL** | **7.5** | ✅ `rom75.bin` | `0EF548h` | `0EFDAEh` |
 | PC-E500 | **7.3** | ⛔ aucun | `0EF533h` | `0EFD99h` |
+| **PC-E500JP** | **7.2** | ⛔ aucun | `0EF548h` | `0EFDAEh` |
 | — | 5.3 | ✅ `rom53.bin` | `0EF52Dh` | `0EFD90h` |
 
 ⚠️ **Le PC-E500-BL porte la même 7.5 que le PC-E550** (essai du 2026-09-29, relevé identique au
@@ -939,7 +977,7 @@ première génération, la seconde celle du PC-U6000 — que `HISTDRV` avait jus
 de l'avoir mesurée (`12` §17). Ce sont les deux dont nous n'avons pas le dump, et ce sont
 exactement celles que la table n'aurait jamais pu couvrir.
 
-Les relevés sont conservés : `Documentation/T2BINRES-84.TXT`, `-83`, `-75`, `-75-BL`, `-73`.
+Les relevés sont conservés : `Documentation/T2BINRES-84.TXT`, `-83`, `-75`, `-75-BL`, `-73`, `-72`.
 
 ⚠️ `T2BINRES-75.TXT` (PC-E550) est une **transcription** : l'outil de copie était indisponible à ce
 moment-là et le fichier a été retapé depuis sa lecture. Son contenu est identique à celui du
@@ -951,16 +989,17 @@ provenance.
 
 | Service | 8.4 | 8.3 | 7.5 | 7.3 | 5.3 | Établie par |
 |---|---|---|---|---|---|---|
-| `eval` | `0EF2AEh` | `0EF26Eh` | `0EF548h` | `0EF533h` | `0EF52Dh` | ✅ empreinte, **balayage exécuté** sur 8.4, 8.3, 7.5 et 7.3 |
+| `eval` | `0EF2AEh` | `0EF26Eh` | `0EF548h` | `0EF533h` | `0EF52Dh` | ✅ empreinte, **balayage exécuté** sur 8.4, 8.3, 7.5, 7.3 et 7.2 |
 | `dec2bin` | `0EFB13h` | `0EFAD4h` | `0EFDAEh` | `0EFD99h` | `0EFD90h` | ✅ idem |
 | `chknum` | — | `0EFBF3h` | `0EFECDh` | — | `0EFEAFh` | ⚙️ identité de code, exécutée sur 8.3 seulement |
 
 ⚠️ La colonne **5.3** reste la seule jamais exécutée : nous en avons le dump, pas la machine.
 
 > **Le bilan de la section, en une phrase.** Un objet de 630 octets, sans une ligne de différence,
-> a appelé `eval` et `dec2bin` sur **quatre révisions de ROM** — dont **deux dont nous ne possédons
-> aucun dump** — en trouvant leurs adresses lui-même, et il n'a bloqué aucune machine. La table
-> n'est plus le moyen : elle est la trace.
+> a appelé `eval` et `dec2bin` sur **cinq révisions de ROM** — dont **trois dont nous ne possédons
+> aucun dump** — en trouvant leurs adresses lui-même, et il n'a bloqué aucune machine. Une table
+> indexée par la version aurait planté sur l'une (7.3) et refusé une autre (7.2). La table n'est
+> plus le moyen : elle est la trace.
 
 **La table n'est plus le moyen : elle est la trace.** Un programme qui a besoin de ces adresses les
 cherche ; la table sert à vérifier qu'il a trouvé ce qu'il fallait.
