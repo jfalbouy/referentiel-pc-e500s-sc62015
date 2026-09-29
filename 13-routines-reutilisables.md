@@ -309,7 +309,7 @@ ap_chknum:
         callf   000000H                 ; <- reecrit
 ```
 
-Une version inconnue n'est pas devinée : la sonde refuse (état 1). Elle signe ses octets (`0D2h`),
+Une version inconnue n'est pas devinée : la sonde refuse (état 1) — ⛔ **ce n'était vrai qu'à partir du 2026-09-29, voir plus bas**. Elle signe ses octets (`0D2h`),
 comme l'exige la leçon des sondes précédentes, et rend toujours la main **retenue claire**.
 
 **L'essai décisif est le dernier** : `CALL &BF000 1048576`, soit 2²⁰. `dec2bin` **doit** le
@@ -534,6 +534,64 @@ POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
 LOAD M "X:T2DRY.OBJ"
 RUN                                    ' T2DRY.BAS
 ```
+
+
+#### ⛔ La cause : l'émulateur PC-E500 porte une **ROM 7.3**, que nous n'avons jamais vue
+
+Essai du 2026-09-29 : l'écran affiche **`ROM 7 . 3`**. Notre collection de dumps ne contient que
+trois versions, et 7.3 n'en fait pas partie :
+
+| Dump | Version |
+|---|---|
+| `rom53.bin` | 5.3 |
+| `rom75.bin` | 7.5 |
+| `rom83.bin` | 8.3 |
+
+**Et la sonde ne comparait que le chiffre majeur** — `cmp a,007H` — donc elle a rangé la 7.3 avec
+la 7.5 et posé `0EF548h` dans l'opérande de son `callf`. Un appel lointain au milieu d'une ROM
+inconnue : la machine s'est bloquée, et c'est la seule fin possible.
+
+⛔ **La faute est double, et la seconde est la plus grave.** Le chapitre affirmait, quatre
+paragraphes plus haut : « *Une version inconnue n'est pas devinée : la sonde refuse (état 1)* ».
+**C'était faux du code que j'avais écrit** : le refus n'existait que pour un chiffre majeur autre
+que 5, 7 ou 8. Une prose qui décrit l'intention plutôt que le code est pire qu'une prose absente —
+elle fait porter la confiance sur une garantie qui n'est pas là.
+
+Correction appliquée aux deux sondes : **les deux octets sont comparés**, et seules `5.3`, `7.5` et
+`8.3` sont reconnues.
+
+```asm
+        mv      a,[rom_majeure]
+        cmp     a,007H
+        jrnz    ck53
+        mv      a,[rom_mineure]         ; ⛔ LE SECOND OCTET AUSSI
+        cmp     a,005H
+        jrz     v75
+        jr      inconnue                ; 7.3, 7.4, 7.6 : inconnues, on refuse
+```
+
+✅ **Ce que l'essai a appris de positif, et ce n'est pas rien** : `T2DRY` a été chargée et appelée
+sur le PC-E500 **sans bloquer la machine**. Le `Syntax error in 50` qui a suivi est exactement ce
+qu'elle doit produire — elle s'appelle sans argument et ne consomme donc pas le ` 0` de la ligne de
+`T2BIN.BAS` restée en mémoire. **Réserver, charger en `0BF000h`, appeler et revenir : tout cela
+fonctionne sur une 7.3.** Seul l'appel lointain à une adresse devinée ne fonctionnait pas.
+
+⚠️ **La table de correspondance ne couvre donc pas la machine dont nous disposions pour l'éprouver.**
+Ce n'est pas un échec de la table : c'est la découverte d'une quatrième révision. Deux suites
+possibles, et elles ne s'excluent pas :
+
+1. **Faire parler la 7.3 avec `T2DRY`** — elle lit, elle n'appelle pas. Sur une version inconnue
+   elle choisit désormais le jeu du chiffre majeur et **relit quand même la ROM** : on verra donc
+   noir sur blanc ce qu'une 7.3 porte en `0EF548h`. Si c'est `04 4C F5 07`, les deux révisions
+   partagent l'adresse et la table s'étend d'une colonne. Sinon, l'écart se mesure.
+2. **Obtenir un dump de la 7.3** et lui appliquer la recherche par empreinte du §2.7, comme aux
+   trois autres. C'est la voie complète, mais elle suppose le dump.
+
+> **La leçon de méthode, et elle vaut au-delà de cette sonde** : `HISTDRV` a réussi là où `T2BIN` a
+> échoué parce qu'il adaptait par **intervalle** (« 5.x–7.x contre 8.x », un décalage d'un octet
+> dans un champ), là où `T2BIN` avait besoin d'une **adresse exacte**. Une adaptation par intervalle
+> tolère une révision inconnue ; une table d'adresses, jamais. **Le degré de précision dont on a
+> besoin dicte la sévérité du refus.**
 
 #### Ce que la sonde rend maintenant possible
 
