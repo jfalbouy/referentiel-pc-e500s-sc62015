@@ -924,15 +924,28 @@ serait bloquée comme le 2026-09-29. Aucun raccourci arithmétique ne remplace l
 | PC-U6000 | **8.4** | ⛔ aucun | `0EF2AEh` | `0EFB13h` |
 | PC-E500S | **8.3** | ✅ `rom83.bin` | `0EF26Eh` | `0EFAD4h` |
 | PC-E550 | **7.5** | ✅ `rom75.bin` | `0EF548h` | `0EFDAEh` |
+| **PC-E500-BL** | **7.5** | ✅ `rom75.bin` | `0EF548h` | `0EFDAEh` |
 | PC-E500 | **7.3** | ⛔ aucun | `0EF533h` | `0EFD99h` |
 | — | 5.3 | ✅ `rom53.bin` | `0EF52Dh` | `0EFD90h` |
+
+⚠️ **Le PC-E500-BL porte la même 7.5 que le PC-E550** (essai du 2026-09-29, relevé identique au
+sien ligne pour ligne). La correspondance machine → révision **n'est donc pas bijective** : deux
+modèles distincts peuvent partager une ROM, et — comme le montrent le PC-E500 en 7.3 et le PC-E550
+en 7.5 — **un même modèle peut en porter plusieurs**. C'est une raison de plus de lire la version
+plutôt que de déduire du modèle, et de chercher plutôt que de lire la version.
 
 ⚠️ **Ni la 7.3 ni la 8.4 ne sont des curiosités** : la première est la révision du PC-E500 de
 première génération, la seconde celle du PC-U6000 — que `HISTDRV` avait justement **refusée** faute
 de l'avoir mesurée (`12` §17). Ce sont les deux dont nous n'avons pas le dump, et ce sont
 exactement celles que la table n'aurait jamais pu couvrir.
 
-Les quatre relevés sont conservés : `Documentation/T2BINRES-84.TXT`, `-83`, `-75`, `-73`.
+Les relevés sont conservés : `Documentation/T2BINRES-84.TXT`, `-83`, `-75`, `-75-BL`, `-73`.
+
+⚠️ `T2BINRES-75.TXT` (PC-E550) est une **transcription** : l'outil de copie était indisponible à ce
+moment-là et le fichier a été retapé depuis sa lecture. Son contenu est identique à celui du
+PC-E500-BL, aux espaces terminales et au `1Ah` final près — `T2BINRES-75-BL.TXT` est, lui, l'octet
+pour octet rendu par la machine. Le dire plutôt que de laisser croire que les deux ont la même
+provenance.
 
 #### La table de correspondance, après l'épreuve
 
