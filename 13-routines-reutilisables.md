@@ -593,6 +593,98 @@ possibles, et elles ne s'excluent pas :
 > tolère une révision inconnue ; une table d'adresses, jamais. **Le degré de précision dont on a
 > besoin dicte la sévérité du refus.**
 
+
+#### ✅ Ce que la 7.3 porte vraiment à ces adresses — et le décalage qui s'en déduit
+
+Relevé en mode direct, 2026-09-29, sur l'émulateur PC-E500 :
+
+```
+D3  07 03  48 F5 0E  AE FD 0E  F5 1C 02 90  00 F7 9F 06  07
+|   |      |         |         |            |
+|   |      |         |         |            +-- lus en 0EFDAEh
+|   |      |         |         +--------------- lus en 0EF548h
+|   |      |         +------------------------- dec2bin choisi : 0EFDAEh
+|   |      +----------------------------------- eval choisi : 0EF548h
+|   +------------------------------------------ version 7.3
++---------------------------------------------- signature T2DRY
+```
+
+Ni `F5 1C 02 90` ni `00 F7 9F 06` n'est une vignette `04 xx xx 07` : `callf 0EF548h` exécutait donc
+du code quelconque, et la machine ne pouvait que se bloquer. **La mesure confirme le diagnostic.**
+
+Mais elle donne bien davantage. Ces octets ne sont pas quelconques — **ils sont dans le corps des
+routines que l'on cherchait**, au même endroit pour les deux :
+
+| Service | Octets lus sur la 7.3 | Où ils sont dans le corps de la 7.5 | Adresse 7.5 correspondante |
+|---|---|---|---|
+| `eval` | `F5 1C 02 90` | offset **17** | `0EF55Dh` |
+| `dec2bin` | `00 F7 9F 06` | offset **17** | `0EFDC3h` |
+
+Le même point de code est donc lu en `0EF548h` là où la 7.5 l'a en `0EF55Dh` : **un décalage de
+−21 octets — et exactement le même pour les deux services.** Deux mesures indépendantes qui
+tombent sur le même écart ne sont pas une coïncidence.
+
+⚠️ **D'où une prédiction, qui n'est pas une mesure** : sur 7.3, `eval` serait en `0EF533h` et
+`dec2bin` en `0EFD99h`. C'est en la vérifiant qu'on la croira — et surtout pas en la posant dans un
+`callf`, ce qui serait refaire exactement la faute qui a bloqué la machine.
+
+#### `Documentation/T2FIND.ASM` — ne plus deviner : **faire chercher la machine**
+
+248 octets. La bonne réponse au problème n'est pas une quatrième colonne dans la table : c'est de
+**ne plus avoir besoin de table**.
+
+> ⛔ **Le principe** : les adresses changent d'une révision à l'autre ; **le code, non.** Le corps
+> d'`eval` commence par les mêmes six octets dans `rom53`, `rom75` et `rom83`, et ces six octets
+> n'apparaissent **qu'une seule fois** dans chacune des trois — vérifié sur les dumps. Il suffit
+> donc de les chercher.
+
+| Service | Empreinte cherchée | Position | Vignette |
+|---|---|---|---|
+| `eval` | `72 5C FC 0B BF 04` | offset 0 du corps | trouvé − 4 |
+| `dec2bin` | `65 01 80 18 0A` | offset 6 du corps | trouvé − 10 |
+
+Vérification sur les trois dumps : la recherche rend `0EF52Dh`/`0EFD90h` sur `rom53`,
+`0EF548h`/`0EFDAEh` sur `rom75`, `0EF26Eh`/`0EFAD4h` sur `rom83` — **les adresses exactes de la
+table, retrouvées sans la table.**
+
+La sonde balaie `0C0000h`-`0FFFFFh` octet par octet. Le test de fin tient au fait que `X` n'a que
+**20 bits** : passé `0FFFFFh` il reboucle à `000000h`, et le quartet de poids fort redescend sous
+`0Ch` :
+
+```asm
+boucle: mv      (000H),x                ; les trois octets de X en RAM interne
+        mv      a,(002H)                ; bits 16-19
+        cmp     a,00CH
+        jrc     fini                    ; sorti de la ROM : termine
+        mv      a,[x]
+        cmp     a,072H                  ; ancre d'eval
+        jrz     t_ev
+        cmp     a,065H                  ; ancre de dec2bin
+        jrz     t_d2
+```
+
+Elle **compte toutes les occurrences** (un `x1` à l'affichage est aussi un résultat : il dit que
+l'empreinte est restée discriminante), et **relit les quatre octets** à l'adresse trouvée — on doit
+y voir `04 xx xx 07`.
+
+⚠️ Le balayage couvre 256 Ko : compter quelques secondes. La sonde **n'appelle rien** et n'écrit
+que dans sa zone ; elle ne peut pas bloquer la machine.
+
+```basic
+POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
+LOAD M "X:T2FIND.OBJ"
+RUN
+```
+
+Attendu sur la 7.3, si la prédiction du décalage est juste : `EVAL EF533 x1 : 04 37 F5 07` et
+`D2B EFD99 x1 : 04 9D FD 07`.
+
+> **Ce que cela change pour toute extension du BASIC portable.** Une table d'adresses vieillit :
+> elle ne connaît que les ROM qu'on a dumpées, et elle est muette — donc dangereuse — sur les
+> autres. Une **recherche par empreinte à l'installation** ne connaît que du code, et le code est
+> ce qui ne bouge pas. Elle coûte quelques secondes une fois, au chargement du pilote, et elle
+> **échoue proprement** quand elle ne trouve pas : c'est exactement ce qui manquait à `T2BIN`.
+
 #### Ce que la sonde rend maintenant possible
 
 La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
