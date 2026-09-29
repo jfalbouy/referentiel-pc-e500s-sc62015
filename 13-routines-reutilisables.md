@@ -471,6 +471,70 @@ qu'il fait tokeniser puis évaluer. Le service `eval` de la ROM (`0EF26Eh`) atte
 second que `BASEXT` et `T2BIN` appellent. Le premier est la voie BASIC pour évaluer une expression
 construite à l'exécution ; il n'a pas d'équivalent en machine sans passer par le tokeniseur.
 
+
+#### ⛔ Sur PC-E500 (7.5), la sonde plante — et ce n'est pas la table
+
+Essai du 2026-09-29 sur l'émulateur PC-E500 : `RUN`, la version s'affiche, puis **la machine se
+bloque** (écran brouillé, `RESET` nécessaire). Trois causes étaient possibles. **Deux se sont
+écartées sans toucher à la machine** — c'est tout l'intérêt d'avoir les dumps et les essais
+précédents sous la main.
+
+**1. « L'adresse d'`eval` serait fausse » — écartée.** Les trois ROM portent à l'adresse attendue
+la même vignette, relue octet à octet dans les dumps :
+
+| ROM | Adresse | Octets | Décodé | Début du corps |
+|---|---|---|---|---|
+| 8.3 | `0EF26Eh` | `04 72 F2` `07` | `call 0F272h` + `retf` | `72 5C FC 0B…` |
+| 7.5 | `0EF548h` | `04 4C F5` `07` | `call 0F54Ch` + `retf` | `72 5C FC 0B…` |
+| 5.3 | `0EF52Dh` | `04 31 F5` `07` | `call 0F531h` + `retf` | `72 5C FC 0B…` |
+
+Chaque vignette appelle **`soi + 4`** : c'est un enrobage `retf` posé juste devant la routine, et
+le corps commence par les mêmes octets dans les trois. Même constat pour `dec2bin` (`0EFAD4h`,
+`0EFDAEh`, `0EFD90h`, corps `65 00 80 15…`).
+
+**2. « La réservation ou l'adresse de chargement ne conviendraient pas au PC-E500 » — écartée.**
+`HISTDRV` emploie **exactement** la même ligne — `POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8` —
+et le même `0BF000h`, et il tourne sur cet émulateur (essai du 2026-09-24, `12` §17).
+
+**3. Le chemin d'appel lui-même.** C'est ce qui reste, et cela recouvre au moins trois choses
+qu'aucune mesure ne sépare encore : le `popu` de l'argument (le `CALL` de la 7.5 ne laisse
+peut-être pas `X` où celui de la 8.3 le laisse), le `callf` et son cadre, et l'écriture de la zone
+de résultat **à 32 octets du plafond** `0BFC00h` — `HISTDRV` n'était jamais monté au-delà de
+`0BF937h`.
+
+⚠️ **À noter, parce que cela change la lecture du plantage** : `BASEXT` non plus n'a jamais tourné
+sur un PC-E500. Appeler un service du BASIC depuis `0BF000h` sur une 7.5 est un terrain **entièrement
+neuf** — l'échec n'accuse pas la table, il dit qu'on y arrive pour la première fois.
+
+#### `Documentation/T2DRY.ASM` — la sonde à blanc
+
+140 octets. Elle **lit tout et n'appelle rien** : pas de `popu` (elle s'appelle sans argument, la
+pile `U` reste intacte), pas de `callf`, et sa zone de résultat est en `0BF700h`, loin du plafond.
+Elle fait une chose de plus que T2BIN, et c'est celle qui compte :
+
+```asm
+pose:   mv      [res_ev],x              ; l'adresse choisie
+        mv      y,res_oev
+        mv      il,004H
+cp_ev:  mv      a,[x++]                 ; RELIRE LA ROM DE LA MACHINE
+        mv      [y++],a
+        dec     il
+        jrnz    cp_ev
+```
+
+**Elle relit dans la ROM de la machine les quatre octets du service qu'elle aurait appelé.** Si
+l'émulateur rend `04 4C F5 07` pour `eval`, sa ROM est bien celle de notre dump et **la table est
+confirmée sur place** — le problème est alors entièrement dans le chemin d'appel. Si elle rend
+autre chose, c'est une autre révision, et la table ne la couvre pas.
+
+Un seul essai, qui ne peut rien casser :
+
+```basic
+POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
+LOAD M "X:T2DRY.OBJ"
+RUN                                    ' T2DRY.BAS
+```
+
 #### Ce que la sonde rend maintenant possible
 
 La table du §2.7 n'a été confrontée qu'à la colonne **8.3**, celle que `BASEXT` avait déjà mesurée
