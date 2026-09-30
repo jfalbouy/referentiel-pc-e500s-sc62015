@@ -1391,6 +1391,52 @@ que `sbcl` arme bien la retenue sur emprunt (c'est ce que `jrnc` suppose), qu'il
 comme compteur d'octets, et que le `rc` préalable soit nécessaire. Trois points que seule la
 machine tranche — et c'est exactement pour cela que la routine reste ⚙️.
 
+### 5.1 Le banc d'essai — `routines-2026.asm` §7, pour PC-E500S (8.3)
+
+La marche à suivre ci-dessus est désormais **câblée dans le fichier lui-même** : sa section 7 est un
+banc qui exerce tout le reste. Le premier octet du fichier est un `jp banc`, si bien que
+`CALL &BF000` lance les essais ; les routines continuent de s'appeler par leur nom.
+
+⛔ **Pourquoi une seule machine, alors que la section 6 est portable.** Parce que sur la **8.3**, et
+sur elle seule, **nous connaissons déjà les réponses** : `BASEXT` a mesuré les cinq adresses il y a
+des mois, par une tout autre voie. Le banc peut donc **vérifier** ce que `rom_trouver` trouve au
+lieu de seulement l'afficher. **Un essai qui sait ce qu'il doit obtenir vaut mieux que six essais
+qui rendent un chiffre.**
+
+Le mode se pose avant l'appel — `POKE &BFA01,n : CALL &BF000 [argument]` :
+
+| Mode | Ce qu'il éprouve | Attendu |
+|---|---|---|
+| 0 | `rom_trouver`, puis comparaison aux cinq adresses connues | `5 / 5` conformes, chaque empreinte `x1` |
+| 1 | `hex_20`, `hex_byte`, `dec_u24`, `ex_lire`, `ex_nom11` | `BF000 AB 1048575`, `12345`, dépassement refusé, `PLINK   SYS` |
+| 2 | `ex_arg` — `eval` + `dec2bin` sur `100*3+45` | `345` |
+| 3 | `ex_terme` — `chknum` + `dec2bin` sur `12345` | `12345` |
+| 4 | `ex_rendre` — le **refus** sur `&345678` | état 6, erreur **33** |
+| 5 | `ex_res` — `alloc` de 32 octets | `U` reculé de **32**, puis rendu |
+| 6 | les écritures par le FCS, à l'écran | trois lignes lisibles |
+
+⛔ **Le mode 4 n'éprouve que le refus, et c'est voulu.** `ex_rendre` écrit dans `(bp+0)` et
+`(bp+1)` : depuis un mot-clé c'est la case du résultat, depuis un simple `CALL` c'est **le cadre
+courant de l'interpréteur**, et y écrire le corromprait. Le chemin de refus, lui, rend la main
+**avant** d'avoir touché à `BP` — c'est donc le seul qui soit sûr ici, et c'est justement celui qui
+porte la correction, puisque `bin2dec` tronque en silence. Le chemin de succès demande un vrai
+mot-clé, c'est-à-dire `BASEXT`.
+
+⛔ **Le dernier essai du programme BASIC doit échouer.** Après `CLOSE`, `TROUT.BAS` fait
+`POKE &BFA01,3 : CALL &BF000 100*3+45` : `chknum` ne lit qu'un terme, il s'arrête sur le `*`, et
+l'interpréteur reprend la ligne au mauvais endroit — `Syntax error` attendu. Le fichier est déjà
+fermé quand cela se produit. **Un essai qui doit échouer est un essai comme un autre**, à condition
+de le dire avant.
+
+```basic
+POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8
+LOAD M "X:ROUTINES.OBJ"
+RUN                                    ' TROUT.BAS, relevé dans F:TROUTRE.TXT
+```
+
+⚠️ Le code va de `0BF000h` à `0BF7B0h` (1969 octets) et la zone d'essai commence en `0BFA00h` ;
+l'assembleur le vérifie par un `assert`. Le mode 0 balaie 256 Ko : compter quelques secondes.
+
 ---
 
 ## 6. Voir aussi
