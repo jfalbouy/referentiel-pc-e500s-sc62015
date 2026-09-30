@@ -55,10 +55,10 @@ déduits, ils sont éprouvés.
 
 | Service | Adresse | Contrat |
 |---|---|---|
-| `chknum` | `0EFBF3h` | évalue l'expression numérique pointée par `X`, vérifie le type, pousse un cadre et laisse le nombre BASIC en `(bp+0)`. Carry armé = erreur |
+| `chknum` | `0EFBF3h` | évalue **un seul terme** — il s'arrête au premier opérateur —, vérifie le type, pousse un cadre de **15 octets** et laisse le nombre BASIC en `(bp+0)`. Carry armé = erreur |
 | `dec2bin` | `0EFAD4h` | le nombre BASIC de `(bp+0)` → **entier 24 bits** en `(bp+1)`..`(bp+3)`. ⛔ **Refuse au-delà de 2²⁰** (erreur 33) : `X` étant un registre de 20 bits, `0EFAFBh` fait `add x,a` / `jrc` |
 | `bin2dec` | `0EFB6Fh` | **`(bp+0)` = les attributs** (`0` = positif, simple précision), **`(bp+1)`..`(bp+3)` = l'entier** → nombre BASIC en `(bp+0)`. ⛔ **Tronque à 20 bits sans rien dire** : `&345678` revenait `&045678`. Tester le quartet haut soi-même et refuser |
-| `eval` | `0EF26Eh` | évalue une **expression complète** (pas seulement un terme) → `(bp+0)`. ⚠️ **Ne signale pas le type** : faire le `test (bp+0),080h` à sa suite, comme la ROM en `0F5F6Bh` |
+| `eval` | `0EF26Eh` | évalue une **expression complète** (pas seulement un terme) → `(bp+0)`. ⚠️ **Ne signale pas le type** : faire le `test (bp+0),080h` à sa suite, comme la ROM en `0F5F6Bh`. ✅ **Son cadre vaut 15 octets**, comme celui de `chknum` — mesuré le 2026-09-30 (§5.2) |
 | `alloc` | `0EF0DDh` | réserve `BA` octets sur la pile `U` (`U -= BA`) ; carry = erreur 54. ⚠️ **Détruit `X`** — le sauver sur la pile `S` autour de l'appel |
 
 ✅ Les cinq sont mesurés : `LPEEK`, `WPEEK`, `LPOKE` et `MOD` les enchaînent, et les deux pièges
@@ -1047,7 +1047,7 @@ ws_fin:
 ⚠️ Octet par octet, donc lent. Pour une longueur connue, **un seul** `fcs_write_block` (`04h`,
 `X` = tampon, `Y` = taille) vaut mieux — c'est ce que fait le gabarit du §3 de la skill.
 
-### 3.2 Hexadécimal — ⛔ **mis en défaut le 2026-09-30**, corrigé, correction **non encore éprouvée**
+### 3.2 Hexadécimal — ✅ éprouvé le 2026-09-30, après une correction que la machine a imposée
 
 `hex_20` reprend l'idiome de `bd_hexa` (`BASEXT-DRV`), qui, lui, **tourne sur machine** : c'est
 ainsi que l'installateur affiche `Hooks: CALL &xxxxx`.
@@ -1089,7 +1089,7 @@ hex_20:
         ret
 ```
 
-### 3.3 Décimal sans la ROM — ⛔ **mis en défaut le 2026-09-30**, corrigé, correction **non encore éprouvée**
+### 3.3 Décimal sans la ROM — ✅ éprouvé le 2026-09-30, après une correction que la machine a imposée
 
 Quand `bin2dec` ne convient pas — par exemple dans un **pilote**, où l'on ne veut pas dépendre du
 cadre `BP` de l'interpréteur —, voici la conversion par soustractions répétées. L'algorithme vient
@@ -1196,7 +1196,7 @@ str_cpy:
         ret
 ```
 
-### 3.5 Cinq exemples d'emploi — ⚙️ assemblés
+### 3.5 Cinq exemples d'emploi — ✅ éprouvés le 2026-09-30 (sauf les écritures FCS)
 
 Les quatre sections précédentes donnent des briques ; celle-ci montre les murs. Elles sont à la fin
 de `Documentation/routines-2026.asm`, assemblées avec le reste.
@@ -1263,7 +1263,7 @@ est le contre-exemple qu'on a payé (`12` §8).
 c'est écrit dans son contrat — et c'est le genre de ligne qu'on ne lit qu'après avoir passé une
 heure sur une boucle qui ne s'arrête pas.
 
-### 3.6 Les cinq services du BASIC, trouvés puis appelés — ⚙️ assemblés
+### 3.6 Les cinq services du BASIC, trouvés puis appelés — ✅ éprouvés le 2026-09-30
 
 La section 6 de `routines-2026.asm` fait pour `chknum`, `dec2bin`, `bin2dec`, `eval` et `alloc` ce
 que `T2FIND` faisait pour deux d'entre eux : elle les **cherche**, puis les appelle. Elle a aussi
@@ -1473,13 +1473,13 @@ laissée par l'appel précédent entrait par le bit 7 : `0ABh` ressortait à `6A
 invisible sur les autres valeurs** : `hex_20` affichait `BF000` sans faute, parce que les bits
 sortants de `0F0h` et `000h` sont des zéros et laissaient la retenue claire. *Correction* : `SWAP A`
 échange les deux quartets et ne touche à rien d'autre — c'est l'instruction faite pour cela.
-⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
+✅ **Corrigé et éprouvé le 2026-09-30.**
 
 **2. `dec_u24` rendait `10` pour `1048575`.** Il rangeait la puissance de dix en `(003H)` — donc sur
 `(003H)`-`(005H)` — **et son compteur de rangs en `(005H)`**. Le compteur était écrasé par l'octet
 de poids fort de la puissance à chaque tour. *Correction* : puissance en `(004H)`-`(006H)`, compteur
 en `(008H)`, drapeau en `(009H)`. ⚠️ Une collision de cases ne se voit **ni à la lecture ni à
-l'assemblage**. ⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
+l'assemblage**. ✅ **Corrigé et éprouvé le 2026-09-30.**
 
 **3. `ex_rendre` avait une garde VIDE, et elle a corrompu l'interpréteur.** Sa garde des 20 bits
 testait le quartet haut de la valeur reçue **dans `X`** — or **`X` n'a que 20 bits** :
@@ -1487,7 +1487,7 @@ testait le quartet haut de la valeur reçue **dans `X`** — or **`X` n'a que 20
 appelée avec `0345678h`, elle a accepté, écrit dans `(bp+0)` et `(bp+1)` — le cadre courant de
 l'interpréteur — et le BASIC a rendu `Mode error in 8261`, un numéro de ligne qui n'existe pas.
 *Correction* : `ex_rendre` prend désormais l'**adresse** de trois octets, ce qui rend la faute
-représentable. ⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
+représentable. ✅ **Corrigé et éprouvé le 2026-09-30.**
 
 > ⛔ **La leçon, et elle dépasse cette routine : une garde écrite contre un registre qui ne peut pas
 > la violer n'est pas une garde.** C'est le **type de l'entrée** qui doit permettre la faute que
@@ -1523,6 +1523,70 @@ l'entrée, `U` à la sortie et `BP` tel que chaque mode l'a laissé, et le progr
 déplacé **après** `CLOSE`, avec un `PRINT` simple : les modes 5 et 6 n'ont encore jamais tourné, et
 ils passeront avant lui.
 
+
+#### ✅ Troisième passage — tout passe, et deux mesures inattendues
+
+`F:TROUTRE.TXT`, PC-E500S 8.3, 2026-09-30 :
+
+```
+TROUT -- ROM 8. 3
+  U BDA99 ->BDA9C  BP BE
+CONFORMES A LA 8.3 : 5 / 5          (les cinq lignes ATTENDU ... OK)
+  U BDA99 ->BDA9C  BP BE
+HEXA/DEC [BF000 AB 1048575]
+EX_LIRE 12345 ETAT 0 / DEPASSEMENT ETAT 1 / EX_NOM11 [PLINK   SYS]
+  U BDA99 ->BDA9C  BP AF
+EX_ARG 100*3+45 = 345 ETAT 6
+  U BDA99 ->BDA9C  BP AF
+EX_TERME 12345 = 12345 ETAT 6
+  U BDA99 ->BDA9C  BP BE
+EX_RES U BDA9C ->BDA7C SOIT 32 ATTENDU 32
+MODE 6 : ECRITURES FCS, VOIR L ECRAN
+```
+puis, à l'écran : `ETAT 6 ERR 33 ATTENDU 6 ET 33`, `U BDA99 ->BDA9C BP BE`, et enfin
+`Syntax error in 610` — **l'essai qui doit échouer**.
+
+✅ **Les sept modes passent.** `ex_res` recule `U` de **32 octets exactement** ; `ex_rendre` refuse
+`0345678h` avec l'**erreur 33** ; `hex_byte` et `dec_u24` sont confirmés. Les routines des §3.2,
+§3.3, §3.4 et les exemples des §3.5 et §3.6 passent de ⚙️ à ✅.
+
+##### ⛔ La trace de `BP` répond à une question laissée ouverte dans `BASEXT`
+
+`BASEXT.ASM` porte depuis des mois ce commentaire :
+
+> *Le cadre poussé par `chknum` vaut 15 octets, MESURÉ sur machine (BP 150 → 135). Celui d'`eval`
+> ne l'est PAS : je ne le suppose donc pas […] l'écart se mesurera au prochain essai.*
+
+**Le voici.** `BP` vaut `0BEh` à l'entrée de chaque mode ; les modes 2 et 3 le laissent tous deux à
+`0AFh`. `0BEh − 0AFh = 0Fh = 15`.
+
+| Mode | Service | `BP` laissé | Cadre |
+|---|---|---|---|
+| 2 | `eval` + `dec2bin` | `0AFh` | **15 octets** |
+| 3 | `chknum` + `dec2bin` | `0AFh` | 15 octets — conforme à la mesure de `BASEXT` |
+| 0, 1, 4, 5 | — | `0BEh` | aucun |
+
+✅ **Le cadre d'`eval` vaut donc 15 octets, comme celui de `chknum`.** La prudence de `BASEXT` —
+restaurer `BP` par sa valeur absolue plutôt que par un `pmdf` compté à la main — reste la bonne
+conduite, mais elle n'est plus une ignorance : c'est une mesure. ⚠️ `dec2bin` ne pousse rien, il
+écrit dans le cadre existant, ce que ces deux lignes confirment aussi.
+
+##### ⚠️ Une anomalie non expliquée, et je préfère l'écrire
+
+Au passage précédent, le mode 4 — *identique* — faisait échouer la ligne `PRINT L$:PRINT #1,L$` qui
+venait de tourner quinze fois (`Syntax error in 940`). Ici, placé **après `CLOSE`** et rapporté par
+un `PRINT` simple, il passe, et sa trace est parfaitement propre : `U` rendu à l'octet près, `BP`
+inchangé.
+
+⛔ **La cause n'est donc pas dans le mode 4**, et je ne sais pas où elle est. Trois différences
+subsistent entre les deux passages — le fichier ouvert ou fermé, le `GOSUB` qui suivait l'appel sur
+la même ligne, la position dans le programme — et **aucune mesure ne les sépare**. Le relevé
+`TROUTRE-2.TXT` est conservé avec le défaut ; il sera repris si le symptôme revient. Une anomalie
+qu'on cesse d'observer n'est pas une anomalie résolue.
+
+⚠️ **Le mode 6 a tourné sans erreur, mais son rendu n'a pas été relevé** : les trois lignes du FCS
+ont défilé avant la fin du programme. `wr_str`, `wr_blk` et `wr_crlf` restent donc ⚙️ — l'essai les
+a exécutées, personne n'a lu ce qu'elles ont écrit.
 ---
 
 ## 6. Voir aussi
