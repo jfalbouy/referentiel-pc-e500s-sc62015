@@ -1047,7 +1047,7 @@ ws_fin:
 ⚠️ Octet par octet, donc lent. Pour une longueur connue, **un seul** `fcs_write_block` (`04h`,
 `X` = tampon, `Y` = taille) vaut mieux — c'est ce que fait le gabarit du §3 de la skill.
 
-### 3.2 Hexadécimal — ✅ éprouvé le 2026-09-30, après correction
+### 3.2 Hexadécimal — ⛔ **mis en défaut le 2026-09-30**, corrigé, correction **non encore éprouvée**
 
 `hex_20` reprend l'idiome de `bd_hexa` (`BASEXT-DRV`), qui, lui, **tourne sur machine** : c'est
 ainsi que l'installateur affiche `Hooks: CALL &xxxxx`.
@@ -1089,7 +1089,7 @@ hex_20:
         ret
 ```
 
-### 3.3 Décimal sans la ROM — ✅ éprouvé le 2026-09-30, après correction
+### 3.3 Décimal sans la ROM — ⛔ **mis en défaut le 2026-09-30**, corrigé, correction **non encore éprouvée**
 
 Quand `bin2dec` ne convient pas — par exemple dans un **pilote**, où l'on ne veut pas dépendre du
 cadre `BP` de l'interpréteur —, voici la conversion par soustractions répétées. L'algorithme vient
@@ -1473,12 +1473,13 @@ laissée par l'appel précédent entrait par le bit 7 : `0ABh` ressortait à `6A
 invisible sur les autres valeurs** : `hex_20` affichait `BF000` sans faute, parce que les bits
 sortants de `0F0h` et `000h` sont des zéros et laissaient la retenue claire. *Correction* : `SWAP A`
 échange les deux quartets et ne touche à rien d'autre — c'est l'instruction faite pour cela.
+⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
 
 **2. `dec_u24` rendait `10` pour `1048575`.** Il rangeait la puissance de dix en `(003H)` — donc sur
 `(003H)`-`(005H)` — **et son compteur de rangs en `(005H)`**. Le compteur était écrasé par l'octet
 de poids fort de la puissance à chaque tour. *Correction* : puissance en `(004H)`-`(006H)`, compteur
 en `(008H)`, drapeau en `(009H)`. ⚠️ Une collision de cases ne se voit **ni à la lecture ni à
-l'assemblage**.
+l'assemblage**. ⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
 
 **3. `ex_rendre` avait une garde VIDE, et elle a corrompu l'interpréteur.** Sa garde des 20 bits
 testait le quartet haut de la valeur reçue **dans `X`** — or **`X` n'a que 20 bits** :
@@ -1486,7 +1487,7 @@ testait le quartet haut de la valeur reçue **dans `X`** — or **`X` n'a que 20
 appelée avec `0345678h`, elle a accepté, écrit dans `(bp+0)` et `(bp+1)` — le cadre courant de
 l'interpréteur — et le BASIC a rendu `Mode error in 8261`, un numéro de ligne qui n'existe pas.
 *Correction* : `ex_rendre` prend désormais l'**adresse** de trois octets, ce qui rend la faute
-représentable.
+représentable. ⚠️ **La correction n'a pas encore tourné** : elle reste ⚙️.
 
 > ⛔ **La leçon, et elle dépasse cette routine : une garde écrite contre un registre qui ne peut pas
 > la violer n'est pas une garde.** C'est le **type de l'entrée** qui doit permettre la faute que
