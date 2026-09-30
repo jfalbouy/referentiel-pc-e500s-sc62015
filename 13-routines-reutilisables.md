@@ -1047,7 +1047,7 @@ ws_fin:
 ⚠️ Octet par octet, donc lent. Pour une longueur connue, **un seul** `fcs_write_block` (`04h`,
 `X` = tampon, `Y` = taille) vaut mieux — c'est ce que fait le gabarit du §3 de la skill.
 
-### 3.2 Hexadécimal — ⚙️ assemblé, idiome ✅ éprouvé
+### 3.2 Hexadécimal — ✅ éprouvé le 2026-09-30, après correction
 
 `hex_20` reprend l'idiome de `bd_hexa` (`BASEXT-DRV`), qui, lui, **tourne sur machine** : c'est
 ainsi que l'installateur affiche `Hooks: CALL &xxxxx`.
@@ -1089,7 +1089,7 @@ hex_20:
         ret
 ```
 
-### 3.3 Décimal sans la ROM — ⚙️ assemblé, **non éprouvé**
+### 3.3 Décimal sans la ROM — ✅ éprouvé le 2026-09-30, après correction
 
 Quand `bin2dec` ne convient pas — par exemple dans un **pilote**, où l'on ne veut pas dépendre du
 cadre `BP` de l'interpréteur —, voici la conversion par soustractions répétées. L'algorithme vient
@@ -1434,8 +1434,65 @@ LOAD M "X:ROUTINES.OBJ"
 RUN                                    ' TROUT.BAS, relevé dans F:TROUTRE.TXT
 ```
 
-⚠️ Le code va de `0BF000h` à `0BF7B0h` (1969 octets) et la zone d'essai commence en `0BFA00h` ;
+⚠️ Le code va de `0BF000h` à `0BF7C1h` (1986 octets) et la zone d'essai commence en `0BFA00h` ;
 l'assembleur le vérifie par un `assert`. Le mode 0 balaie 256 Ko : compter quelques secondes.
+
+### 5.2 ✅ Premier passage, 2026-09-30 — ce qu'il a confirmé et les trois défauts qu'il a trouvés
+
+`F:TROUTRE.TXT`, PC-E500S, ROM 8.3 :
+
+```
+TROUT -- ROM 8. 3
+CONFORMES A LA 8.3 : 5 / 5
+CHKNUM  EFBF3 X 1 ATTENDU EFBF3 OK
+DEC2BIN EFAD4 X 1 ATTENDU EFAD4 OK
+BIN2DEC EFB6F X 1 ATTENDU EFB6F OK
+EVAL    EF26E X 1 ATTENDU EF26E OK
+ALLOC   EF0DD X 1 ATTENDU EF0DD OK
+HEXA/DEC [BF000 ?B 10]            <- attendu BF000 AB 1048575
+EX_LIRE 12345 ETAT 0 ATTENDU 12345 ETAT 0
+DEPASSEMENT ETAT 1 ATTENDU 1
+EX_NOM11 [PLINK   SYS]
+EX_ARG 100*3+45 = 345 ETAT 6 ATTENDU 345
+EX_TERME 12345 = 12345 ETAT 6 ATTENDU 12345
+```
+puis, au mode 4 : `Mode error in 8261`.
+
+✅ **Ce qui est acquis, et c'est le principal.** `rom_trouver` rend **5 / 5** : les cinq services
+retrouvés par empreinte, chacun `x1`, **aux adresses exactes que `BASEXT` avait mesurées par une
+tout autre voie**. La recherche des cinq services est éprouvée sur machine. Et avec elle :
+`ex_lire` (`12345`, dépassement refusé), `ex_nom11` (`PLINK   SYS`), `ex_arg` (`345` — l'expression
+entière), `ex_terme` (`12345`).
+
+⛔ **Et trois défauts, dans du code qui passait l'assembleur depuis deux jours.** C'est exactement
+ce pour quoi le banc existe ; ils valent d'être listés, car aucun n'était visible à la lecture.
+
+**1. `hex_byte` rendait `A1` pour `0ABh`.** Il extrayait le quartet haut par quatre `shr a`. Or
+**`SHR` et `SHL` passent par la retenue** — c'est écrit dans nos propres références — et la retenue
+laissée par l'appel précédent entrait par le bit 7 : `0ABh` ressortait à `6Ah`. ⚠️ **Le défaut était
+invisible sur les autres valeurs** : `hex_20` affichait `BF000` sans faute, parce que les bits
+sortants de `0F0h` et `000h` sont des zéros et laissaient la retenue claire. *Correction* : `SWAP A`
+échange les deux quartets et ne touche à rien d'autre — c'est l'instruction faite pour cela.
+
+**2. `dec_u24` rendait `10` pour `1048575`.** Il rangeait la puissance de dix en `(003H)` — donc sur
+`(003H)`-`(005H)` — **et son compteur de rangs en `(005H)`**. Le compteur était écrasé par l'octet
+de poids fort de la puissance à chaque tour. *Correction* : puissance en `(004H)`-`(006H)`, compteur
+en `(008H)`, drapeau en `(009H)`. ⚠️ Une collision de cases ne se voit **ni à la lecture ni à
+l'assemblage**.
+
+**3. `ex_rendre` avait une garde VIDE, et elle a corrompu l'interpréteur.** Sa garde des 20 bits
+testait le quartet haut de la valeur reçue **dans `X`** — or **`X` n'a que 20 bits** :
+`mv x,0345678H` charge `045678h`, et la garde ne pouvait **jamais** se déclencher. Le banc l'a
+appelée avec `0345678h`, elle a accepté, écrit dans `(bp+0)` et `(bp+1)` — le cadre courant de
+l'interpréteur — et le BASIC a rendu `Mode error in 8261`, un numéro de ligne qui n'existe pas.
+*Correction* : `ex_rendre` prend désormais l'**adresse** de trois octets, ce qui rend la faute
+représentable.
+
+> ⛔ **La leçon, et elle dépasse cette routine : une garde écrite contre un registre qui ne peut pas
+> la violer n'est pas une garde.** C'est le **type de l'entrée** qui doit permettre la faute que
+> l'on prétend refuser. Et l'avertissement que j'avais écrit en tête du mode 4 — « le chemin de
+> succès corromprait le cadre de l'interpréteur » — était juste : c'est ce chemin-là qui s'est
+> exécuté, faute d'avoir vérifié que la garde pouvait l'en empêcher.
 
 ---
 
