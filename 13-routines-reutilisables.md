@@ -57,12 +57,19 @@ déduits, ils sont éprouvés.
 |---|---|---|
 | `chknum` | `0EFBF3h` | évalue l'expression numérique pointée par `X`, vérifie le type, pousse un cadre et laisse le nombre BASIC en `(bp+0)`. Carry armé = erreur |
 | `dec2bin` | `0EFAD4h` | le nombre BASIC de `(bp+0)` → **entier 24 bits** en `(bp+1)`..`(bp+3)`. ⛔ **Refuse au-delà de 2²⁰** (erreur 33) : `X` étant un registre de 20 bits, `0EFAFBh` fait `add x,a` / `jrc` |
-| `bin2dec` | `0EFB6Fh` | l'entier de `(bp+0)`..`(bp+3)` → nombre BASIC en `(bp+0)`. ⛔ **Tronque à 20 bits sans rien dire** : `&345678` revenait `&045678`. Tester le quartet haut soi-même et refuser |
-| `eval` | `0EF26Eh` | évalue une **expression complète** (pas seulement un terme) → `(bp+0)` |
-| `alloc` | `0EF0DDh` | réserve `BA` octets sur la pile `U` (`U -= BA`) ; carry = erreur 54 |
+| `bin2dec` | `0EFB6Fh` | **`(bp+0)` = les attributs** (`0` = positif, simple précision), **`(bp+1)`..`(bp+3)` = l'entier** → nombre BASIC en `(bp+0)`. ⛔ **Tronque à 20 bits sans rien dire** : `&345678` revenait `&045678`. Tester le quartet haut soi-même et refuser |
+| `eval` | `0EF26Eh` | évalue une **expression complète** (pas seulement un terme) → `(bp+0)`. ⚠️ **Ne signale pas le type** : faire le `test (bp+0),080h` à sa suite, comme la ROM en `0F5F6Bh` |
+| `alloc` | `0EF0DDh` | réserve `BA` octets sur la pile `U` (`U -= BA`) ; carry = erreur 54. ⚠️ **Détruit `X`** — le sauver sur la pile `S` autour de l'appel |
 
 ✅ Les cinq sont mesurés : `LPEEK`, `WPEEK`, `LPOKE` et `MOD` les enchaînent, et les deux pièges
 notés `⛔` ont été payés puis corrigés (`12` §5 et §8).
+
+⛔ **La ligne de `bin2dec` disait « l'entier de `(bp+0)`..`(bp+3)` », ce qui laissait croire à un
+entier de quatre octets.** `LPEEK` et `WPEEK` font autre chose, et c'est eux qui ont raison :
+`(bp+0)` porte les **attributs** — le même octet que celui décrit au §2.7 pour une constante
+tokenisée, bit 3 = signe, bit 0 = précision — et l'entier tient en `(bp+1)`..`(bp+3)`, exactement
+là où `dec2bin` le dépose. Les deux services sont donc symétriques ; la formulation précédente le
+masquait.
 
 > **La leçon de méthode** : avant d'écrire une conversion décimale, regarder si la ROM ne la fait
 > pas déjà. Ici elle la fait, en deux appels, avec le domaine complet du BASIC — et l'écrire
@@ -643,6 +650,11 @@ tombent sur le même écart ne sont pas une coïncidence.
 |---|---|---|---|
 | `eval` | `72 5C FC 0B BF 04` | offset 0 du corps | trouvé − 4 |
 | `dec2bin` | `65 01 80 18 0A` | offset 6 du corps | trouvé − 10 |
+
+⚠️ **Ce « − 4 » est un raccourci**, et le §3.6 a découvert qu'il ne vaut pas pour tous les services :
+la vignette de `bin2dec` est à **+28** de son corps sur 8.3 et à plus de 3700 octets sur 7.5. La
+méthode générale cherche la vignette **par son opérande**, dans la page du corps. Elle est correcte
+ici parce qu'`eval` et `dec2bin` sont du bon côté du raccourci — pas parce que le raccourci l'était.
 
 Vérification sur les trois dumps : la recherche rend `0EF52Dh`/`0EFD90h` sur `rom53`,
 `0EF548h`/`0EFDAEh` sur `rom75`, `0EF26Eh`/`0EFAD4h` sur `rom83` — **les adresses exactes de la
@@ -1250,6 +1262,90 @@ est le contre-exemple qu'on a payé (`12` §8).
 ⚠️ **`ex_dump` met `IL` à l'abri avant le premier appel** (`mv (007H),il`) : `hex_20` détruit `IL`,
 c'est écrit dans son contrat — et c'est le genre de ligne qu'on ne lit qu'après avoir passé une
 heure sur une boucle qui ne s'arrête pas.
+
+### 3.6 Les cinq services du BASIC, trouvés puis appelés — ⚙️ assemblés
+
+La section 6 de `routines-2026.asm` fait pour `chknum`, `dec2bin`, `bin2dec`, `eval` et `alloc` ce
+que `T2FIND` faisait pour deux d'entre eux : elle les **cherche**, puis les appelle. Elle a aussi
+corrigé deux hypothèses que je n'avais pas énoncées, et dont l'une était fausse.
+
+#### Les cinq empreintes
+
+| Service | Empreinte du **corps** | Décalage dans le corps |
+|---|---|---|
+| `chknum` | `1C 0B 65 00 80` | +3 |
+| `dec2bin` | `65 01 80 18 0A` | +6 |
+| `bin2dec` | `CA 0B 01 DC 01` | +0 |
+| `eval` | `72 5C FC 0B BF 04` | +0 |
+| `alloc` | `B4 37 8C DE FC` | +0 |
+
+Chacune est **unique** dans `rom53`, `rom75` et `rom83` — une seule occurrence dans les 256 Ko. Les
+cinq ancres (`1C`, `65`, `CA`, `72`, `B4`) étant distinctes, **une seule traversée** les cherche
+toutes les cinq.
+
+#### ⛔ Ce que la recherche a appris : la vignette ne précède pas toujours la routine
+
+`T2FIND` prenait « vignette = trouvé − 4 » comme si le `call`/`retf` était toujours collé devant le
+corps. **C'est vrai de quatre services sur cinq, et faux du cinquième** — ce qui est la meilleure
+façon de ne jamais s'en apercevoir :
+
+| Service | Écart entre la vignette et son corps, sur 8.3 / 7.5 / 5.3 |
+|---|---|
+| `chknum`, `dec2bin`, `eval`, `alloc` | +4, +4, +4 |
+| **`bin2dec`** | **+28, +3788, +3785** |
+
+D'où une recherche en **deux temps** : l'empreinte donne le **corps**, puis on cherche la vignette
+`04 lo hi 07` dont l'opérande vaut les 16 bits bas du corps. C'est la méthode générale ; la
+précédente était un raccourci qui marchait par chance.
+
+#### ⛔ Deux règles sur la vignette, chacune pour une raison mesurée
+
+**1. On ne cherche que dans la page du corps.** Le `call` d'une vignette est un saut de 16 bits : il
+ne sort pas de sa page de 64 Ko. Sur `rom53`, **`0FFD90h` porte exactement les quatre octets de la
+vraie vignette de `dec2bin`** (`0EFD90h`) — mais en page `F`. L'appeler ferait brancher 64 Ko plus
+loin. Une recherche naïve le retiendrait.
+
+**2. On prend la plus proche en dessous du corps.** Une même routine peut avoir **plusieurs**
+vignettes : `rom83` en a deux pour `bin2dec`, `0EECBFh` et `0EFB6Fh`, toutes deux `04 8B FB 07`.
+Elles sont équivalentes — même `call`, même `retf`, même page — mais la plus proche est celle que
+le constructeur a posée devant la routine, et c'est celle des tables.
+
+⚠️ **Rejoué sur les trois dumps, l'algorithme exact rend 13 des 15 adresses du §2.7 à l'identique**
+et, pour `bin2dec` sur 7.5 et 5.3, une vignette **différente mais équivalente** (`0EFE49h` et
+`0EFE2Bh` au lieu de `0EEF99h` et `0EEF7Eh`). La table avait retenu une vignette plus lointaine.
+⚠️ Leur équivalence est **déduite de l'encodage, pas mesurée** : c'est la prochaine chose à faire
+tourner.
+
+#### Les quatre exemples d'appel
+
+| Exemple | Service | Ce qu'il montre |
+|---|---|---|
+| `ex_arg` | `eval` + `dec2bin` | lire l'argument numérique d'un mot-clé — l'idiome de `LPEEK` et `MOD` |
+| `ex_terme` | `chknum` + `dec2bin` | un seul **terme** — l'idiome de `PEEK` |
+| `ex_rendre` | `bin2dec` | rendre un entier au BASIC, **avec le garde-fou des 20 bits** |
+| `ex_res` | `alloc` | réserver un tampon sur la pile `U` |
+
+**`ex_arg` contre `ex_terme` n'est pas une affaire de goût : cela décide de la syntaxe du mot-clé.**
+`PEEK` emploie `chknum` (`0F5F9Ch`), et c'est pourquoi `PEEK &BFD1C*&100` se lit
+`(PEEK &BFD1C)*&100` ; `POINT (x,y)` emploie `eval`. Calquer un nouveau mot-clé sur `PEEK`, c'est
+prendre `chknum` ; le calquer sur `POINT`, c'est prendre `eval`. `MOD` a payé la différence
+(`12` §5).
+
+**Le garde-fou de `ex_rendre` n'est pas une précaution, c'est une correction** : `bin2dec` tronque
+à 20 bits **sans rien dire**. Un résultat faux est pire qu'une erreur — on teste le quartet haut
+soi-même et on rend l'erreur 33, celle que la ROM emploie pour ce cas.
+
+```asm
+ex_rendre:
+        mv      (000H),x
+        mv      a,(002H)
+        and     a,0F0H                  ; au-dela de 20 bits ?
+        jrnz    rn_trop
+        ...
+        mv      (BP+1),x                ; l'entier, sur trois octets
+        mv      (BP+0),000H             ; positif, simple precision
+rn_bd:  callf   000000H                 ; OPERANDE REECRIT
+```
 
 ---
 
