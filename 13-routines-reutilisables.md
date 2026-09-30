@@ -1437,7 +1437,7 @@ RUN                                    ' TROUT.BAS, relevé dans F:TROUTRE.TXT
 ⚠️ Le code va de `0BF000h` à `0BF7C1h` (1986 octets) et la zone d'essai commence en `0BFA00h` ;
 l'assembleur le vérifie par un `assert`. Le mode 0 balaie 256 Ko : compter quelques secondes.
 
-### 5.2 ✅ Premier passage, 2026-09-30 — ce qu'il a confirmé et les trois défauts qu'il a trouvés
+### 5.2 ✅ Premiers passages, 2026-09-30 — ce qu'ils ont confirmé, et ce qui résiste
 
 `F:TROUTRE.TXT`, PC-E500S, ROM 8.3 :
 
@@ -1494,6 +1494,34 @@ représentable. ⚠️ **La correction n'a pas encore tourné** : elle reste ⚙
 > l'on prétend refuser. Et l'avertissement que j'avais écrit en tête du mode 4 — « le chemin de
 > succès corromprait le cadre de l'interpréteur » — était juste : c'est ce chemin-là qui s'est
 > exécuté, faute d'avoir vérifié que la garde pouvait l'en empêcher.
+
+#### ✅ Second passage — les deux premières corrections tiennent
+
+```
+HEXA/DEC [BF000 AB 1048575]
+  ATTENDU [BF000 AB 1048575]
+```
+
+`hex_byte` (`SWAP A`) et `dec_u24` (cases déplacées) sont **éprouvés**. Tout le reste est identique
+au premier passage : `5 / 5` sur `rom_trouver`, `ex_lire`, `ex_nom11`, `ex_arg`, `ex_terme`.
+
+#### ⛔ Ce qui résiste : le mode 4 dérange encore l'interpréteur
+
+`Syntax error in 940` — c'est-à-dire sur la ligne `PRINT L$:PRINT #1,L$:RETURN`, qui venait de
+tourner quinze fois sans faute. L'appel du mode 4 rend pourtant la main proprement : le listing
+montre que la garde se déclenche (`34h` dans le quartet haut), qu'`ex_rendre` sort par `rn_trop`
+**avant** toute écriture dans `BP`, et que `b_sortie` rend `BP` et la retenue. **Le défaut n'est
+donc pas là où je le cherchais**, et je ne sais pas encore où il est.
+
+⚠️ **Écrire « je ne sais pas » ici vaut mieux qu'une troisième hypothèse.** Les deux premières —
+« la garde refuse, donc tout va bien » puis « le chemin de succès est le seul risque » — se sont
+révélées justes *et* insuffisantes.
+
+Le passage suivant apporte donc une **mesure** plutôt qu'une idée : `banc` relève désormais `U` à
+l'entrée, `U` à la sortie et `BP` tel que chaque mode l'a laissé, et le programme les imprime après
+**chaque** mode. Si un mode fait dériver la pile `U` ou `BP`, la ligne le dira. Le mode 4 est
+déplacé **après** `CLOSE`, avec un `PRINT` simple : les modes 5 et 6 n'ont encore jamais tourné, et
+ils passeront avant lui.
 
 ---
 
