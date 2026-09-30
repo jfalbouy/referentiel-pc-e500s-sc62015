@@ -1023,7 +1023,7 @@ cherche ; la table sert à vérifier qu'il a trouvé ce qu'il fallait.
 Le code qui suit est dans `Documentation/routines-2026.asm`, **assemblé par `xasm2026-4`** et
 relu au désassembleur. Les numéros d'encodage cités sont ceux que produit l'assembleur.
 
-### 3.1 Écrire une chaîne — ⚙️ assemblé
+### 3.1 Écrire une chaîne — ✅ éprouvé le 2026-09-30 (`wr_blk` excepté)
 
 ```asm
 ; wr_str -- ecrit une chaine terminee par 0 sur un handle ouvert.
@@ -1196,7 +1196,7 @@ str_cpy:
         ret
 ```
 
-### 3.5 Cinq exemples d'emploi — ✅ éprouvés le 2026-09-30 (sauf les écritures FCS)
+### 3.5 Cinq exemples d'emploi — ✅ éprouvés le 2026-09-30
 
 Les quatre sections précédentes donnent des briques ; celle-ci montre les murs. Elles sont à la fin
 de `Documentation/routines-2026.asm`, assemblées avec le reste.
@@ -1584,9 +1584,36 @@ la même ligne, la position dans le programme — et **aucune mesure ne les sép
 `TROUTRE-2.TXT` est conservé avec le défaut ; il sera repris si le symptôme revient. Une anomalie
 qu'on cesse d'observer n'est pas une anomalie résolue.
 
-⚠️ **Le mode 6 a tourné sans erreur, mais son rendu n'a pas été relevé** : les trois lignes du FCS
-ont défilé avant la fin du programme. `wr_str`, `wr_blk` et `wr_crlf` restent donc ⚙️ — l'essai les
-a exécutées, personne n'a lu ce qu'elles ont écrit.
+##### ✅ Le mode 6 — les écritures par le FCS, et une ligne qui se vérifie toute seule
+
+```
+1048575
+BF000 02 3F F5 90 04 60 00 18
+FIN -- VOIR F:TROUTRE.TXT
+```
+
+⛔ **La ligne de vidage est une preuve en elle-même.** `ex_dump` a vidé les huit premiers octets de
+`0BF000h`, c'est-à-dire **sa propre image**, et ils correspondent **octet pour octet** à ce que
+l'assembleur a produit :
+
+| Octets | Ce que c'est |
+|---|---|
+| `02 3F F5` | `jp banc` — `banc` est en `0BF53Fh` |
+| `90 04` | `mv a,[x]` — la première instruction de `wr_str` |
+| `60 00` | `cmp a,000H` |
+| `18` | `jrz ws_fin` |
+
+Un essai qui affiche un nombre attendu peut se tromper de nombre ; **un essai qui affiche le code
+qu'il exécute ne peut pas se tromper de code**.
+
+✅ **Sont donc éprouvés d'un coup** : `wr_str`, `wr_crlf`, `ex_deci`, `ex_dump` — et
+**`(cl) = 0` désigne bien l'écran**, ce qui n'était jusqu'ici qu'une note de commentaire.
+`hex_20`, `hex_byte` et `dec_u24` le sont une seconde fois, par une autre voie que le mode 1.
+
+⚠️ **Deux réserves, petites mais réelles.** Le texte `X=BF000` d'`ex_hexa` a défilé hors de l'écran
+de quatre lignes : sa fin de ligne a forcément fonctionné — sinon `1048575` n'aurait pas commencé
+une ligne — mais son texte n'a pas été lu. Un `POKE &BFA01,6 : CALL &BF000` en mode direct le
+montrerait. Et **`wr_blk` reste ⚙️** : aucun exemple ne l'appelle.
 ---
 
 ## 6. Voir aussi
