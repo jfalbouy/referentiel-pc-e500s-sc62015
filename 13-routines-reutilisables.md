@@ -1,6 +1,6 @@
 # Routines réutilisables — ce qu'on ne devrait plus jamais réécrire
 
-*Rédigé le 2026-09-28 — mis à jour le 2026-09-29*
+*Rédigé le 2026-09-28 — mis à jour le 2026-09-30*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce chapitre rassemble des routines prêtes à l'emploi
 > pour écrire un nouveau programme : celles que la **ROM offre déjà** — et qu'il serait absurde de
@@ -1183,6 +1183,73 @@ str_cpy:
         jrnz    str_cpy
         ret
 ```
+
+### 3.5 Cinq exemples d'emploi — ⚙️ assemblés
+
+Les quatre sections précédentes donnent des briques ; celle-ci montre les murs. Elles sont à la fin
+de `Documentation/routines-2026.asm`, assemblées avec le reste.
+
+⛔ **La leçon commune aux cinq, et elle ne se voit pas à l'assemblage** : `hex_20`, `hex_byte` et
+`dec_u24` **écrivent, mais ne terminent pas**. Elles posent des caractères et avancent `Y` ; c'est à
+l'appelant d'écrire le `0` final avant d'appeler `wr_str`. Une chaîne produite ici et une chaîne
+attendue par `wr_str` n'ont pas le même contrat.
+
+| Exemple | Ce qu'il montre | Routines assemblées |
+|---|---|---|
+| `ex_hexa` | écrire `X=0BF000` et un CRLF | `hex_20` + `wr_str` + `wr_crlf` |
+| `ex_deci` | écrire un entier en décimal | `dec_u24` + `wr_str` |
+| `ex_nom11` | `plink.sys` → `PLINK   SYS` | `upcase` |
+| `ex_lire` | lire un entier décimal **ASCII** | `skip_spc` + `is_digit` |
+| `ex_dump` | une ligne de vidage complète | `hex_20` + `hex_byte` + `wr_str` |
+
+**`ex_nom11` est le format des en-têtes de bloc de `S1:`** (`03` §7) : 8 + 3 caractères, majuscules,
+complétés d'espaces, sans le point. Le pré-remplissage d'espaces n'est pas une précaution, **c'est
+le format** — et l'extension se pose en `+8` quoi qu'il arrive, d'où la destination **relue** plutôt
+que « là où `Y` en est » :
+
+```asm
+ex_nom11:
+        mv      [!n11_dst],y            ; l'extension se posera en +8 : garder
+        mv      a,020H
+        mv      il,00BH
+n11_esp:
+        mv      [y++],a                 ; onze espaces : le format lui-meme
+        dec     il
+        jrnz    n11_esp
+        ...
+n11_ext:
+        mv      y,[!n11_dst]            ; l'extension va en +8, TOUJOURS
+```
+
+**`ex_lire` est l'inverse de `dec_u24`, et surtout il n'est pas `dec2bin`.** `dec2bin` (§2.1)
+convertit le nombre BASIC **déjà rangé dans le cadre de l'interpréteur** ; il ne lit pas d'ASCII, et
+on ne peut pas lui en donner — le §2.7 a coûté trois relevés pour l'apprendre. Pour de l'ASCII la
+ROM ne fait rien pour nous : **c'est précisément le cas où écrire soi-même se justifie.** La
+multiplication par dix tient en quatre additions de registres, et **chacune est suivie d'un `jrc`** :
+
+```asm
+        pushu   x                       ; X sert au calcul : garder le pointeur
+        mv      x,y                     ; X = v
+        add     y,y                     ; Y = 2v
+        jrc     lr_deb
+        add     y,y                     ; Y = 4v
+        jrc     lr_deb
+        add     y,x                     ; Y = 5v
+        jrc     lr_deb
+        add     y,y                     ; Y = 10v
+        jrc     lr_deb
+        add     y,a                     ; Y = 10v + chiffre
+        jrc     lr_deb
+```
+
+⚠️ On hérite ainsi de **la même limite que `dec2bin`, 20 bits, pour la même raison** : le registre
+n'en a pas plus. `0EFAFBh` fait exactement cela dans la ROM — `add x,a` / `jrc` — et rend l'erreur
+33 (§2.1). Le dépassement se **signale**, il ne se tronque pas ; `bin2dec`, qui tronque en silence,
+est le contre-exemple qu'on a payé (`12` §8).
+
+⚠️ **`ex_dump` met `IL` à l'abri avant le premier appel** (`mv (007H),il`) : `hex_20` détruit `IL`,
+c'est écrit dans son contrat — et c'est le genre de ligne qu'on ne lit qu'après avoir passé une
+heure sur une boucle qui ne s'arrête pas.
 
 ---
 
