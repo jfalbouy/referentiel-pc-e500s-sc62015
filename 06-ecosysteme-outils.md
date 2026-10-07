@@ -1,6 +1,6 @@
 # Écosystème d'outils déjà réalisés (dans `C:\Claude`)
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-25*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-07*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier répond directement à la demande initiale : « compléter ce que nous avons déjà réalisé » — il cartographie les projets existants, leur rôle, et comment ils s'articulent entre eux et avec le contenu des autres fichiers de ce référentiel.
 
@@ -36,7 +36,7 @@ Deux familles d'outils cohabitent : la chaîne **BASIC** (texte ↔ tokenisé �
 | **`BASEXT-DRV`** (`C:\Claude\BASEXT-DRV`) | **BASEXT résident, sous forme de pilote** : les mêmes quatorze mots-clés dans un bloc `BASEXT.SYS` de `S1:` (device `BEXT:`), ce qui rend la zone langage machine au BASIC. Le code des mots-clés n'y est **pas recopié** : `include ..\..\BASEXT\src\BASEXT.ASM`. Installateur en `0BF000h` (relocation au format Kon auto-vérifiée sur la machine, insertion avant `DATA.BAS` sur le modèle de PLINKC, recalage du BASIC), désinstallation `CALL &BF000 "-U"`. `outils/reloc.py` **mesure** la table de relocation par double assemblage et la vérifie à une troisième origine. Dépôt **public** `github.com/jfalbouy/sharp-pce500s-basext-drv`, sous **PolyForm Noncommercial 1.0.0**, avec un `NOTICE.md` qui dit ce que l'installateur doit au `DRIVER_TEMPLATE` et à PLINKC (2026-09-24). | Version 0.2 éprouvée sur émulateur le 2026-09-16 : bloc immobile, `BEXTTEST.BAS` 14/14, zone rendue, désinstallation ; `OFF`/`ON`, petit reset et soft RESET sans effet sur le pilote. | `BASEXTDR.ASM` + `BASEXT.ASM` → `BASEXTDR.OBJ` / `.UU` + `DRVTEST.BAS` généré, par `outils/construire.py` (jamais `xasm2026-4` seul). |
 | **`HIS111`** / **`HISTDRV`** (`C:\Claude\HIS111`) | **History 1.11** (TORO, 1994) : l'original (`hist111.asm`, assembleur Katsuyō Kenkyū), sa conversion `history.asm` pour `xasm2026-4` (identique à `history.bin`, `05` §7ter), et **`HISTDRV`**, sa version **pilote de `S1:`** (`HISTORY.SYS`, device `HIST:`) : le TSR de TORO, étiquettes renommées, dans l'installateur de `BASEXT-DRV` ; tampon d'historique dans le bloc ; **version de la ROM lue à l'installation** pour servir l'E500 comme l'E500S (`03` §3bis). `outils/construire.py` importe `BASEXT-DRV/outils/reloc.py`. Dépôt privé `github.com/jfalbouy/sharp-pce500s-keyboard_history` (il porte le TSR de TORO). | 0.2 **validée sur PC-E500S réel** (installation, rappel, désinstallation) et sur émulateurs PC-E500S et PC-E500, le 2026-09-24. | `HISTDRV.ASM` → `HISTDRV.OBJ` / `.UU` + `HISTTEST.BAS` généré, par `outils/construire.py`. |
 | **`SC62015Disassembler/Samples/DEVICE9`** | **Sondes** du Function Driver (`SQR`, `ADDTEST`, `DIVTEST`, `MATTEST`), chacune avec son programme BASIC d'essai. | Validées sur PC-E500S et PockEmul, septembre 2026 ; les résultats sont consignés dans l'en-tête de chaque source. | Source `.ASM` → `.OBJ` / `.UU` + `.BAS` d'essai ; journal dans `12-extensions-basic.md`. |
-| **`PLINKC162`** | Driver IOCS résident (« Pocket Link Cache »), lecteur virtuel `L:` relié par liaison série à un serveur PC (`APLINKS`). ✅ **Auteurs, lus dans l'en-tête de la source A62** : PLINKC 1.62 est de **Daisuke Mizobata** (« Copyright (c) 1996,1997,1999 »), *based on* **PLINK.SYS 1.04**, « Copyright (c) 1990,93,94 by N.Kon » — le même N. Kon que XASM 1.0 (`05` §1). Exemple réel et complet de programme en langage machine + protocole. Le serveur a été **modernisé** : `APLINKS` 1.05 **décode** de lui-même en `.obj` les `.uue`/`.uux` reçus de la machine, et 1.06 **encode** au démarrage les `.obj` en `.uue` (`--uuencode`), ce qui joint le lecteur `L:` et l'enveloppe texte (`05` §5.1bis). | Archive historique (1999) restructurée pour publication : `original/` intact + `modernized/` + `NOTICE` ; dépôt public `github.com/jfalbouy/sharp-pce500-plinkc-`. | Source assembleur `PLINKC.asm`/`.BAS` ; protocole documenté dans `Anleitung.txt`. |
+| **`PLINKC162`** | Driver IOCS résident (« Pocket Link Cache »), lecteur virtuel `L:` relié par liaison série à un serveur PC (`APLINKS`). ✅ **Auteurs, lus dans l'en-tête de la source A62** : PLINKC 1.62 est de **Daisuke Mizobata** (« Copyright (c) 1996,1997,1999 »), *based on* **PLINK.SYS 1.04**, « Copyright (c) 1990,93,94 by N.Kon » — le même N. Kon que XASM 1.0 (`05` §1). Exemple réel et complet de programme en langage machine + protocole. Le serveur a été **modernisé** : `APLINKS` 1.05 **décode** de lui-même en `.obj` les `.uue`/`.uux` reçus de la machine, et 1.06 **encode** au démarrage les `.obj` en `.uue` (`--uuencode`), ce qui joint le lecteur `L:` et l'enveloppe texte (`05` §5.1bis). ✅ **Et le pilote lui-même l'a été en octobre 2026** (`1.62-2026.1`, §3ter). | Archive historique (1999) restructurée pour publication : `original/` intact + `modernized/` + `NOTICE` ; dépôt public `github.com/jfalbouy/sharp-pce500-plinkc-`. | Source assembleur `PLINKC.asm`/`.BAS` ; protocole documenté dans `Anleitung.txt`. |
 
 **Comment ils se répondent :** `SC62015Disassembler` utilise les mêmes tables de référence que XASM (`Data/OpcodeTable.json` dérive de la même documentation que la table d'opcodes XASM) et se valide contre des `.lst` **produits par XASM lui-même** sur des programmes réels (`register`, `tmap`, `vogue` — voir `Docs/Exemples/`). `xasm2026-4` se valide à son tour contre `xasm2026-1` en réassemblant les mêmes sources. `PLINKC162` est un cas d'usage réel qui mobilise à la fois l'assembleur (écrire le driver) et la structure IOCS documentée en `04-fcs-iocs.md` (installer un en-tête de driver, cf. `03-memoire-et-systeme-pc-e500s.md` §7). `BASEXT-DRV` en a repris le modèle d'installation après avoir mesuré l'échec de l'ajout en fin de chaîne (`03` §7bis), et a servi de banc d'essai à `xasm2026-4` : c'est la confrontation de ses objets au moteur C et à `reloc.py` qui a fait trouver les défauts de l'octet PRE et de `rel`.
 
@@ -52,6 +52,55 @@ Deux familles d'outils cohabitent : la chaîne **BASIC** (texte ↔ tokenisé �
 | **`UUENCODE-UUDECODE`** (`C:\Claude\UUENCODE-UUDECODE`) | Réécriture **C17 portable** de `UUENCODE.EXE`/`UUDECODE.EXE` 5.25 (*UU-ENCODE/UU-DECODE for PC*, R. Marks, 1993), les outils MS-DOS par lesquels les objets du PC-E500S voyagent en texte depuis toujours — sous Windows 11 ils ne tournent plus que dans DOSBox. Sources d'origine perdues : la référence est le **comportement observé**, mesuré sur les sorties des binaires de 1993. Alphabet XXDECODE (`-x`), format Unix (`-u`), et `-b` qui produit le bloc `.uux` de la machine. `FORMATS.md` compare les **quatre** formes de l'enveloppe (`05` §5.1bis) ; `EXTRACT.BAS` complète les outils côté machine. Dépôt privé `github.com/jfalbouy/sharp-pce500s-uuencode`. | **Codage identique à l'octet** à celui de 1993 (en-tête, lignes de contrôle, `1Ah`) ; `.UUE` et `.UUX` produits **sur PC-E500S réel** relus conformes, et `uuencode -b` du PC identique à `UUENC3 -B` de la machine (2026-09-23) ; 26 essais, 0 échec. |
 
 Ces six projets couvrent ensemble le cycle complet d'un programme BASIC : écriture/édition en texte, renumérotation, tokenisation pour stockage natif sur la machine (le format interne du PC-E500S n'est pas du texte brut), et transfert physique vers/depuis un PC actuel.
+
+### 3bis. ✅ Ce que coûte vraiment un transfert — mesuré le 2026-10-07
+
+Sur PC-E500S réel, à 19200 bauds, par le lecteur `L:` de `PLINKC` et `APLINKS 1.07` dont l'option
+`-v` horodate chaque lecture et chaque écriture (cycle depuis la requête précédente, attente du
+pocket, durée du transfert) :
+
+| Ce qu'on transfère | Temps par secteur | Sur le fil | Rendement |
+|---|---|---|---|
+| `LOAD` d'un programme **tokenisé** | **71,7 ms** | 68,8 ms | **96 %** |
+| `LOAD` d'un programme en **texte ASCII** | **517 ms** | 68,8 ms | 13 % |
+
+⛔ **La liaison série n'est pas le goulot : la tokenisation l'est.** Un `LOAD` tokenisé tourne à
+**96 % du débit théorique du fil** — il n'y a essentiellement rien à y gagner. Un `LOAD` en texte
+coûte **sept fois plus**, parce que le Sharp doit tokeniser chaque ligne au vol : environ **75 s
+contre 10 à 12 s** pour 20 Ko.
+
+> **La conduite qui en découle** : transférer les programmes BASIC **tokenisés** (`SAVE` sans `,A`,
+> ou `.BSA`), et ne garder le texte que pour ce qui doit être lu par un humain.
+
+✅ **Deux optimisations écartées par la mesure, et c'est le meilleur usage qu'on en fasse** : lire
+**plusieurs secteurs en une seule requête** ne promettait que **4 %** — le protocole n'est pas le
+problème ; et **envoyer un secteur en un seul appel d'écriture** (option `--bulk`, essayée puis
+retirée) n'a eu **aucun effet** mesurable. Les deux idées étaient plausibles ; elles ne tenaient
+pas devant le chronomètre.
+
+### 3ter. ✅ `PLINKC 1.62-2026.1` — le pilote de 1999 remis au travail (2026-10-06/07)
+
+Assemblé **depuis la source même de Mizobata** par `xasm2026-4`, qui reproduit l'assembleur A62 de
+N. Kon. Le comportement de 1999 est conservé ; ce qui s'ajoute répond à des pannes constatées :
+
+| Ajout | Ce qu'il corrige |
+|---|---|
+| **Vitesse propre au pilote** (`drv_ucr`, 19200 bauds), rangée **dans son bloc** | ⛔ Un `RESET` remet le `COM:` du BASIC à **1200 bauds** (`0BFD33h`) et désaccordait le pocket du PC **sans prévenir** (`03` §3) |
+| Chargement en **`0BE000h`**, réservation de **7168 octets** | ⛔ L'objet fait **3314 octets** : en `0BF000h` il dépassait le plafond `0BFC00h` de **242 octets**, **sans aucune alerte** (`12` §14) |
+| `CALL &BE000 "-U"` — **désinstallation** | Bloc reconnu à son en-tête `L:` ; **refus si un pilote est installé au-dessus**, dont les blocs bougeraient — la limite mesurée au `03` §7bis |
+| `INIT "L:?"` état, `INIT "L:H"` aide (avec pause, pour 4 lignes), `INIT "L:T"` test de liaison, `INIT "L:Bnnnnn"` vitesse | Une option inconnue est **signalée** au lieu d'être ignorée |
+| Mode **256 Ko** et question de mode **`'Q'`** | Le pilote adopte le mode **réel** du serveur, au lieu de lire la FAT comme un répertoire quand les deux ne s'accordent pas |
+
+⚠️ **`verifier.py` contrôle l'objet, pas la source**, et c'est nécessaire : dans un pilote au format
+Kon la **table de relocation est émise après `END`**, donc aucun `assert` écrit dans la source ne
+peut voir le dépassement du plafond (`12` §14). Il vérifie aussi la table à **deux origines**.
+
+Côté PC, **`APLINKS 1.07`** répond à `'Q'`, accepte `-2` (256 Ko), **refuse les secteurs hors du
+disque** et contrôle les chaînes FAT à la déconnexion — deux cas où la 1.06 plantait, reproduits au
+banc. ⛔ **La 1.06 n'est pas modifiée** : elle reste la référence, et `reference/` conserve la
+source de l'auteur, qui **redonne à l'octet** le `PLINKC.OBJ` de 1999.
+
+✅ Tout validé sur **PC-E500S réel** les 2026-10-06 et 10-07, `RESET` sans `OPEN` compris.
 
 ## 4. Documentation transverse
 

@@ -1,6 +1,6 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
-*Rédigé le 2026-09-03 — mis à jour le 2026-09-26*
+*Rédigé le 2026-09-03 — mis à jour le 2026-10-07*
 
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
@@ -171,7 +171,7 @@ dehors: retf
 
 **`EFB6FH` ne convertit que 20 bits.** Son code fait trois passes de décalage : 8 bits, 8 bits, puis **quatre** seulement sur le troisième octet. `8 + 8 + 4 = 20` — c'est un convertisseur d'**adresse**, et une adresse fait 20 bits sur cette machine. Une valeur de 24 bits perd son quartet haut **sans que rien ne le signale** : `&345678` revient en `&045678`. Une extension qui lit trois octets doit donc refuser plutôt que tronquer (`LPEEK` rend l'erreur 33, *Data out of range*, celle que `F5C9A` emploie pour le même cas).
 
-**`BFD1AH` n'est pas une adresse de chargement.** `USRWRK` y est un **pointeur** de 3 octets vers la zone langage machine (§14), et les paramètres SIO commencent 23 octets plus loin, en `BFD31H`. Un programme assemblé en `BFD1AH` écrase donc le pointeur, puis la configuration de la liaison série — vitesse, parité, contrôle des lignes, code de fin de fichier — c'est-à-dire, sur un poste qui transfère par série, le canal lui-même. La panne se manifeste au transfert **suivant**. Charger en `BF000H`, l'adresse qu'emploient `PLINK` et `PLINKC`, après avoir réservé la zone (§14).
+**`BFD1AH` n'est pas une adresse de chargement.** `USRWRK` y est un **pointeur** de 3 octets vers la zone langage machine (§14), et les paramètres SIO commencent 23 octets plus loin, en `BFD31H`. Un programme assemblé en `BFD1AH` écrase donc le pointeur, puis la configuration de la liaison série — vitesse, parité, contrôle des lignes, code de fin de fichier — c'est-à-dire, sur un poste qui transfère par série, le canal lui-même. La panne se manifeste au transfert **suivant**. Charger en `BF000H`, l'adresse qu'emploient `PLINK` et `PLINKC` 1.62, après avoir réservé la zone (§14) — ⚠️ **à condition que le module y tienne** : `PLINKC 1.62-2026.1`, qui fait 3314 octets, déborde le plafond `0BFC00h` de 242 octets et se charge en `0BE000h` (§14).
 
 ⛔ Une version antérieure de ce paragraphe écrivait « **`USRWRK` ne fait que 23 octets** — la zone langage machine commence en `BFD1AH` ». La mise en garde était juste, sa lecture ne l'était pas : ces 23 octets sont la distance au premier paramètre SIO, et la zone commence à l'adresse que le pointeur **contient**. Corrigé le 2026-09-14, à la source dans `SC62015Disassembler/Data/SystemAddresses.json`, puis `pce500.inc` régénéré — la même erreur que `BASWRK` (§7).
 
@@ -699,6 +699,24 @@ jeu, c'est la **protection** du code. Un module en `BF000H` ne reste sûr que si
 réservation le couvre encore. `MODE-EMPLOI.md` §9.2 dit toujours « réinstaller l'extension
 ensuite », ce qui reste la conduite prudente — et de toute façon celle de la première
 installation, où le module se charge après la réservation.
+
+⛔ **RIEN NE VÉRIFIE QUE LE MODULE TIENT SOUS LE PLAFOND.** Un objet trop grand chargé en
+`0BF000h` déborde `0BFC00h` dans la System Data Area **sans la moindre alerte** : ni le `LOADM`,
+ni la réservation, ni l'assembleur ne s'en aperçoivent.
+
+✅ **Mesuré le 2026-10-07 sur `PLINKC 1.62-2026.1`** : l'objet du pilote modernisé fait **3314
+octets** et dépassait donc le plafond de **242 octets**. Remède appliqué : chargement en
+**`0BE000h`** avec une réservation de **7168 octets** (`&BFC00 − &1C00 = &BE000`), et
+`CALL &BE000`.
+
+⚠️ **Et l'assembleur ne peut pas le voir, pour une raison de structure** : dans un pilote au
+format Kon, **la table de relocation est émise après `END`** (`05` §7bis). Aucun `assert` écrit
+dans la source ne la compte — l'`assert btm < …` que recommande le §5.1 du chapitre `13` mesure le
+code, pas l'objet. Le contrôle doit donc se faire **sur le fichier produit**, en dehors de
+l'assembleur : c'est ce que fait `verifier.py` de `PLINKC162`, qui relit l'objet et son en-tête.
+
+> **La règle qui en sort** : pour un module ordinaire, l'`assert` de fin de source suffit ; pour un
+> module **relogeable**, il ment par construction, et seul un contrôle de l'objet dit la vérité.
 
 ⛔ **Un programme d'essai ne doit jamais écrire dans le module.** `BEXTTEST.BAS` faisait
 `LPOKE &BF800`, libre quand le module faisait 1740 octets ; à 2709 octets, `0BF800h` est dans le
