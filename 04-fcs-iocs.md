@@ -148,10 +148,20 @@ code (identique à l'adresse du premier `CALL` près) :
 | 7.5 | `07 05` | `0EBA91h` | `0EBA01h` | `0EB9F6h` |
 | 5.3 | `05 03` | `0EBA76h` | `0EB9E6h` | `0EB9DBh` |
 
-✅ **Mis en œuvre** dans TY-COM 2.02 (`dir_fdd`), qui choisit la ligne par la version puis vérifie
-l'empreinte avant d'appeler. ⛔ La 2.01 passait l'adresse de la routine dans `X` : le CE-140F recevait le
-code de la ROM comme motif et répondait 0 fichier — lecture du lecteur, aucune ligne (émulateur,
-2026-10-08). ⚠️ La 2.02 n'est **pas encore essayée** à la date de rédaction.
+**Le motif est appliqué par le lecteur.** Le manuel d'utilisation du CE-140F (`Manuels CE-140F`,
+pp. 11 et 21) le dit : `?` vaut un caractère, espace de bourrage comprise (`FILES "X:SHARP??.BAS"` trouve
+`SHARP`, `SHARP2`, `SHARP55`, pas `SHARP100`), `*` complète le champ, et ce qui suit un `*` jusqu'au point
+est ignoré (`A*Z.*` = `A*.*`). ⚠️ **Les substituts du lecteur ne le font pas** : le CE-140F de PockEmul
+est un **simulateur**, écrit sans le matériel ni sa ROM (de l'aveu de son auteur, 2026-10), et n'y
+applique pas un joker partiel ; le manuel de l'émulateur matériel de F. Fumi (`CE-140F-EMU-manual.pdf`)
+note que `*` et `?` n'y marchent avec aucune commande. Un programme qui veut marcher partout envoie
+`????????.???` et filtre lui-même.
+
+✅ **Mis en œuvre** dans TY-COM 2.03 (`dir_fdd`, filtre `fdd_match`), qui choisit la ligne par la
+version puis vérifie l'empreinte avant d'appeler. ⛔ La 2.01 passait l'adresse de la routine dans `X` :
+le lecteur recevait le code de la ROM comme motif et répondait 0 fichier. La 2.02 envoyait le motif
+tapé : tout s'affichait avec `????????.???`, rien avec un joker partiel (PockEmul, 2026-10-08).
+⚠️ La 2.03 n'est **pas encore essayée** à la date de rédaction.
 
 > ✅ `Drivers-IOCS.md` §12 concluait qu'« un fichier sur disquette s'ouvre par les fonctions FCS
 > ordinaires ». **Corrigé le 2026-10-08** : les appels de `0DFCAAh` qu'il citait sont l'instruction
