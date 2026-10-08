@@ -132,7 +132,7 @@ CE-140F (protocole : `SC62015Disassembler/Docs/Synthese/Drivers-IOCS.md` §13) :
 
 | Routine (ROM 8.3) | Commande CE-140F | Entrée | Sortie |
 |---|---|---|---|
-| `0EB792h` ouverture du catalogue | `05h` | — | `A` = nombre de fichiers ; carry si erreur |
+| `0EB792h` ouverture du catalogue | `05h` | `X` = **motif**, forme `"X:    NOMFICHI.EXT"` (`0EC22Ch` envoie les 2 caractères du lecteur puis les 12 du nom) | `A` = nombre de fichiers **conformes au motif** ; carry si erreur |
 | `0EB702h` entrée suivante | `06h` | `Y` = tampon de 19 octets | `"X:    "` + `"NOMFICHI.EXT"` + attribut (bit 0 = protégé, le `P` de `FILES`) |
 | `0EB6F7h` entrée précédente | `07h` | idem | idem |
 
@@ -148,8 +148,10 @@ code (identique à l'adresse du premier `CALL` près) :
 | 7.5 | `07 05` | `0EBA91h` | `0EBA01h` | `0EB9F6h` |
 | 5.3 | `05 03` | `0EBA76h` | `0EB9E6h` | `0EB9DBh` |
 
-✅ **Mis en œuvre** dans TY-COM 2.01 (`dir_fdd`), qui choisit la ligne par la version puis vérifie
-l'empreinte avant d'appeler. ⚠️ **Pas encore essayé sur machine** à la date de rédaction.
+✅ **Mis en œuvre** dans TY-COM 2.02 (`dir_fdd`), qui choisit la ligne par la version puis vérifie
+l'empreinte avant d'appeler. ⛔ La 2.01 passait l'adresse de la routine dans `X` : le CE-140F recevait le
+code de la ROM comme motif et répondait 0 fichier — lecture du lecteur, aucune ligne (émulateur,
+2026-10-08). ⚠️ La 2.02 n'est **pas encore essayée** à la date de rédaction.
 
 > ✅ `Drivers-IOCS.md` §12 concluait qu'« un fichier sur disquette s'ouvre par les fonctions FCS
 > ordinaires ». **Corrigé le 2026-10-08** : les appels de `0DFCAAh` qu'il citait sont l'instruction
