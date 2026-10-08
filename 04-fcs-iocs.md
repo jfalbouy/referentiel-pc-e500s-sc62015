@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-26*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-08*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -85,6 +85,76 @@ releve sur un PC-E500S reel (s1-1.bin) -- handle 0 en 0BEE48h :  00 00 E7 21 0F 
 ```
 
 **Conséquence** : un filtre ajouté **en tête de la chaîne** (la méthode de `MEMCHECK`, valable pour les appels IOCS) **ne voit jamais un `PRINT`**. Pour intercepter l'écran, il faut remplacer l'adresse `[bloc du handle 0 + 2]` et transmettre à l'ancienne. ✅ Éprouvé sur machine par le filtre de `XCONSOLE` (`C:\Claude\BASEXT`, septembre 2026 ; `12-extensions-basic.md` §17bis). Si la ROM rouvre `STDO:`, le filtre disparaît simplement. ⚠️ Seul le handle concerné est filtré : un `OPEN "SCRN:"` ouvre un autre handle, qui garde l'adresse de la ROM.
+
+### ⛔ Le FCS refuse le lecteur de disquettes : `X:` et `Y:` n'existent pas pour lui
+
+Relevé dans `rom83` le 2026-10-08, en cherchant pourquoi `DIR X:` de TY-COM répond `error` alors que
+`FILES "X:"` liste la disquette (`C:\Claude\TYCOM2\README.md`).
+
+**Le test.** Les fonctions FCS qui partent d'un nom de lecteur — `00H` création (`0E0840h`), `01H`
+ouverture (`0E070Bh`), `0BH`-`0FH` (`0E0A97h` : informations, **`0CH` recherche**, renommage,
+suppression, capacité libre) — appellent toutes `0E07D0h` :
+
+```asm
+0E07D0  pushu i
+0E07D1  mv    il,000h
+0E07D3  callf iocs_call          ; IOCS 00h find_drive : Y = en-tete du lecteur
+0E07D7  popu  i
+0E07D8  jrc   LOC_E07E2
+0E07DA  mv    a,[y+004h]         ; attribut de l'en-tete (§2.1)
+0E07DD  test  a,080h             ; bit 7 : gerable par le FCS
+0E07DF  jrz   LOC_E07E2
+0E07E1  ret
+0E07E2  mv    a,00Ah             ; "lecteur inexistant"
+0E07E4  sc
+0E07E5  ret
+```
+
+C'est le bit 7 du tableau de §2.1, **vérifié dans le code** : le FCS ne se contente pas de le documenter,
+il l'exige.
+
+**Le lecteur de disquettes ne l'a pas.** Attribut des en-têtes de la ROM (§2.1, chaîne en `03` §7) :
+
+| En-tête | Lecteurs | Attribut | Bit 7 |
+|---|---|---|---|
+| `DF872h` MEMORY CARD | `S1:` `S2:` `S3:` | `0C3h` | ✅ |
+| `DF884h` MEMORY FILE | `E:` `F:` `G:` | `083h` | ✅ |
+| `DF89Ch` FDD | `X:` `Y:` | **`00h`** | ⛔ |
+
+Et son guichet IOCS (`0EB66Ch`) n'accepte que la commande `40h` (`SC62015Disassembler/Docs/Synthese/
+Drivers-IOCS.md` §12). **Toute fonction FCS sur `X:` ou `Y:` rend donc `0AH`**, sur machine comme sur
+émulateur : un programme qui passe par le FCS — TY-DOS, TR-DOS, leurs applications, un pilote — ne lit ni
+n'écrit la disquette.
+
+**Le BASIC contourne le FCS.** `0FE986h` reconnaît un nom `X:` ou `Y:` (`58h`/`59h` suivi de `:`) ; `FILES`
+arme alors le bit 2 de `(016h)` et appelle **directement** les routines du pilote FDD, qui parlent au
+CE-140F (protocole : `SC62015Disassembler/Docs/Synthese/Drivers-IOCS.md` §13) :
+
+| Routine (ROM 8.3) | Commande CE-140F | Entrée | Sortie |
+|---|---|---|---|
+| `0EB792h` ouverture du catalogue | `05h` | — | `A` = nombre de fichiers ; carry si erreur |
+| `0EB702h` entrée suivante | `06h` | `Y` = tampon de 19 octets | `"X:    "` + `"NOMFICHI.EXT"` + attribut (bit 0 = protégé, le `P` de `FILES`) |
+| `0EB6F7h` entrée précédente | `07h` | idem | idem |
+
+Les 19 octets ont la forme exacte du champ que rend `0CH` `find_file` pour les autres lecteurs. Ces
+routines s'appellent par `CALLF` avec le `BP` courant : elles prennent leur cadre **sous** `BP`
+(`pmdf (bp_ram),0FEh` / `0EBh`, soit 2 et 21 octets) et le rendent ; la RAM interne sous `BP` doit donc
+être libre. ⚠️ Leurs adresses dépendent de la ROM ; relevées par leur
+code (identique à l'adresse du premier `CALL` près) :
+
+| ROM | `[0FFFF0h]` | Ouverture | Suivante | Précédente |
+|---|---|---|---|---|
+| 8.3 | `08 03` | `0EB792h` | `0EB702h` | `0EB6F7h` |
+| 7.5 | `07 05` | `0EBA91h` | `0EBA01h` | `0EB9F6h` |
+| 5.3 | `05 03` | `0EBA76h` | `0EB9E6h` | `0EB9DBh` |
+
+✅ **Mis en œuvre** dans TY-COM 2.01 (`dir_fdd`), qui choisit la ligne par la version puis vérifie
+l'empreinte avant d'appeler. ⚠️ **Pas encore essayé sur machine** à la date de rédaction.
+
+> ⚠️ `Drivers-IOCS.md` §12 conclut qu'« un fichier sur disquette s'ouvre par les fonctions FCS
+> ordinaires, et c'est le FCS qui descend dans le driver ». Le test de `0E07D0h` dit le contraire pour
+> l'ouverture (`0E070Bh`). Les appels directs de `0DFCAAh` vers le pilote FDD qu'il cite restent à
+> situer : ils ne sont pas dans la table de répartition du FCS (`0E06DCh`).
 
 ### Codes d'erreur FCS (`C=1`, code retourné dans `A`)
 
