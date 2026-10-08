@@ -1,6 +1,6 @@
 # Mémoire et système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-07*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-08*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier détaille la carte mémoire du PC-E500S (interne + externe), les registres d'E/S, les vecteurs d'interruption et les points d'entrée IOCS. Sources principales : le manuel *ESR-L CPU Instruction Manual*, le *Technical Reference Manual PC-E500*, et la feuille de dépouillement `Docs/Doc technique/PCE500 Description mémoire.xls.xlsx` déjà constituée dans le projet `SC62015Disassembler` (adresses recoupées avec des listings XASM réels).
 
@@ -540,12 +540,19 @@ pas fausser. Installation de `BASEXT-DRV` :
 Un bloc copié à une adresse choisie à l'installation doit voir ses adresses absolues corrigées.
 Quatre modèles existent, et le troisième est le plus surprenant :
 
+✅ **Une table écrite à la main se vérifie par la mesure** (TR-DOS 2, 2026-10-08) :
+`C:\Claude\TRDOS2\outils\verif_reloc.py` fait mesurer par `reloc.py` les champs qui suivent l'origine
+dans `[block_top, block_bottom)`, lit la table telle que la source l'émet, et exige l'**égalité** — tout
+champ de 2 octets (`call`/`jp` proche, que l'installateur ne reloge pas) est une erreur. Témoin positif
+sur la V0.33 (conforme, 59 pointeurs) et négatif (un `relref` retiré : le pointeur manquant est désigné).
+TR-DOS 2 : 67 pointeurs, conforme.
+
 | Modèle | Comment | Où |
 |---|---|---|
 | **Table mesurée** | double assemblage à deux origines, chaque octet qui change est rangé dans un champ de 2 ou 3 octets, table émise au format Kon et vérifiée à une troisième origine | `BASEXT-DRV/outils/reloc.py` ✅ |
 | **Table déclarée** | préfixe `rel` devant chaque instruction à reloger ; l'assembleur émet la table après le code | A62 (N. Kon), `PLINKC`, `xasm2026-4` (`05` §7bis) ✅ |
 | **Analyse du programme** | **aucune table** : l'installateur *analyse* le code et reconnaît lui-même les adresses à corriger | `INSTd`/`INSTt` 1.05 (TORO, 1994) 📖 |
-| **Table écrite à la main** | une étiquette (`p1`…`p16`) posée sur **l'opcode** de chaque instruction à reloger, une table `dp` de ces étiquettes terminée par `-1`. L'installateur fait `inc y` pour passer à l'opérande, ce qui sert aussi à reconnaître la fin : `-1` + 1 = 0 | `EXTSLOT` 1.02 (E. Kako, 1991) ✅ lu, réassemblé |
+| **Table écrite à la main** | une étiquette (`p1`…`p16`) posée sur **l'opcode** de chaque instruction à reloger, une table `dp` de ces étiquettes terminée par `-1`. L'installateur fait `inc y` pour passer à l'opérande, ce qui sert aussi à reconnaître la fin : `-1` + 1 = 0 | `EXTSLOT` 1.02 (E. Kako, 1991) ✅ lu, réassemblé ; **même astuce dans TR-DOS** (T. Kobayashi, 1993) : entrées = adresse du pointeur **moins un**, fin `0FFFFFh` ✅ reconstitué à l'octet |
 
 📖 Le troisième impose des règles à la source, que sa notice énonce (`07` §3bis) et qui disent
 bien ce qu'une analyse peut et ne peut pas faire :
@@ -580,9 +587,45 @@ Autres faits mesurés au passage :
   le pilote du dessus d'abord** (rendre les crochets, délier le maillon), puis de retirer le bloc,
   puis de rattacher à la nouvelle adresse — procédure et essai dans
   `C:\Claude\BASEXT-DRV\essais\KILLSOUS.BAS`.
-- ⚠️ **`SET` et `KILL` sont des commandes de mode direct** : un programme BASIC qui les contient
-  rend `Direct command error` sur la ligne fautive. Toute procédure de retrait de bloc se termine
-  donc par des commandes **tapées**, jamais par un programme qui ferait tout.
+- ✅ **TR-DOS 2 (2026-10-08), troisième installateur au modèle de PLINKC**, et ce que sa reprise a
+  appris. TR-DOS V0.33 (T. Kobayashi, 1993) s'insère lui aussi avant le premier bloc qui n'est pas un
+  pilote, mais il a deux angles morts que la V2 ferme (`C:\Claude\TRDOS2\README.md`) :
+  - ⚠️ si `S1:` ne contenait **que** des pilotes, il garderait l'adresse du **premier** bloc et
+    s'insérerait **devant** eux, en les déplaçant sans relocation. Latent en pratique — `DATA.BAS`
+    est toujours là, premier bloc après un RESET —, mais la V2 suit le parcours et se place après ;
+  - ⛔ il décale **tous** les blocs qui suivent le point d'insertion, y compris un pilote installé
+    **après** des fichiers par un autre moyen : la V2 parcourt ces blocs et **refuse** s'il y trouve
+    l'attribut pilote (`+0Ch`, bits `0Ch`).
+
+  Elle refuse aussi un pilote qui **chevaucherait deux pages de 64 Ko** (les sauts courts restent dans
+  leur page ; même contrôle que PLINKC), et un bloc `TR-DOS  SYS` **resté sans être chaîné**
+  (désinstallé sans `KILL`) : en créer un second donnerait deux fichiers du même nom. ✅ Émulateur et
+  PC-E500S réel.
+- ✅ **Désinstaller sans `d_link`** : TR-DOS 2 retrouve son bloc par la **chaîne des blocs** (signature
+  `0FBh` + nom 8.3), vérifie son header IOCS à `+22h` (nom `DOS:` à `+2Ah`), refuse si un pilote le suit,
+  délie le maillon, puis fait taper `SET`/`KILL` — la conduite de PLINKC. Le header étant au même
+  décalage dans la V0.33, la même commande retire l'une ou l'autre.
+- ⚠️ **`SET`, `KILL`, `COPY` et `NAME` sont des commandes de mode direct** (lettre `D` du manuel) : un
+  programme BASIC qui les contient rend l'erreur **11**, `Direct command error`, sur la ligne fautive.
+  ✅ Mesuré pour `COPY`/`NAME` le 2026-10-08 : la V1 d'un programme de renommage a fini sur « 0 OK,
+  8 ERREUR(S) ». Toute procédure de retrait de bloc se termine donc par des commandes **tapées** — à
+  moins de les faire taper par `KEY 0` (ci-dessous), ou de passer par le FCS : `0Dh` `rename_file` et
+  `0Eh` `delete_file` n'ont pas de restriction de mode (`04` §1).
+- ✅ **`KEY 0` fait taper une ligne au BASIC** — non documenté (le manuel ne cite que les touches 1 à
+  10), mais la ROM le traite. Le gestionnaire de `KEY` (`0FA925h`) lit le numéro par `0FA9C3h`, qui
+  n'en refuse qu'à partir de 11 ; avec **0**, il passe en `0FA99Ch` : contrôle de la longueur contre la
+  taille du tampon clavier `[(iocsw)+14h]` (32 octets), puis commande clavier `45h` (vider le tampon) et
+  `44h` (y déposer la chaîne). Au retour à l'invite, le BASIC lit le tampon comme une frappe : la ligne
+  s'exécute **en mode direct**. D'où l'idiome, ✅ éprouvé sous PockEmul le 2026-10-08 :
+  ```
+  A$="X:SHELL.SSS":B$="F:SHELL"
+  KEY 0,"COPY A$ TO B$:GOTO 200"+CHR$ 13:END
+  ```
+  La ligne doit tenir dans les 32 octets : les noms passent par des variables, que `COPY` accepte, et
+  `GOTO` relance le programme. Mise en œuvre : `C:\Claude\TRDOS2\basic\TR2REN.BAS`.
+- ⚠️ **`COPY` ne connaît pas `S1:`** : ses lecteurs sont `X:`, `Y:`, `E:`, `F:`, `CAS:`, `COM:` (manuel du
+  PC-E500 p. 236, avec la table des combinaisons permises). Une copie depuis la disquette va sur `E:` ou
+  `F:`.
 
 ## 8. Zone haute fixe (`FFFD8H`–`FFFFFH`)
 

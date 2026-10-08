@@ -1,6 +1,6 @@
 # Sources et bibliographie
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-09-26*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-08*
 
 > Voir `00-index.md` pour la vue d'ensemble. Provenance de chaque affirmation du référentiel, classée par fiabilité : manuels Sharp d'origine > rétro-ingénierie vérifiée sur matériel/listings réels > sites communautaires > reconstructions tierces non vérifiées.
 
@@ -36,6 +36,14 @@ dépôt de F. Fumi — dans `SC62015Disassembler/Docs/Synthese/Drivers-IOCS.md` 
 périphérique bit à bit (`041h` = CE-140F), transport par quartets cadencés `BUSY`/`ACK`, et une
 trame `1 octet de commande + N octets de charge + 1 somme de contrôle`.
 
+✅ **Lus le 2026-10-08** (pages rendues en images) : le manuel d'utilisation dit que **le lecteur
+applique lui-même les jokers** (p. 11 « Wild Card », p. 21 `FILES`) — `?` vaut un caractère, espace de
+bourrage comprise, `*` complète le champ, et ce qui suit un `*` jusqu'au point est ignoré ; le manuel de
+service décrit le câble et ses chronogrammes, **pas** la table des commandes ; le manuel de l'émulateur
+de F. Fumi note que `*` et `?`, `COPY`, `LOF`, `NAME` et `SET` n'y fonctionnent pas. ⚠️ Le CE-140F de
+**PockEmul** est un **simulateur**, écrit sans le matériel ni sa ROM (de l'aveu de son auteur) : ce qui
+lui manque ne prouve rien sur le vrai lecteur (`04` §1, « Le FCS refuse le lecteur de disquettes »).
+
 Ces documents ont servi en août 2026 à instruire un défaut de la **sauvegarde texte** vers un
 CE-140F émulé, qui tronque silencieusement à la première ligne dont la somme des octets, CR et LF
 compris, vaut `1Ah` — le marqueur de fin de fichier. Dossier complet, rapport et fichiers d'essai :
@@ -63,6 +71,11 @@ Le Japon est, avec l'Allemagne, le pays où le PC-E500/PC-E500S a été le plus 
 
 - **[Seiji Kako — kako.com](http://www.kako.com/neta/1999-016/1999-016.html)** (加古静司) — ⚠️ *la bannière de XASM et ses listings écrivent « **E.** Kako » : le rapprochement de ce site avec l'auteur de XASM repose sur son contenu, et le prénom n'est confirmé par aucune source du dépôt (`05-format-fichiers-et-xasm.md` §1).* Bibliothèque logicielle de l'auteur historique de **XASM** (`xasm140.lzh`, versions DOS et Win95/98) et du désassembleur **ESR-L `DISASM12`** (« Now all we need is a DIS-ASSEMBLER » — la remarque d'Andrew Woods en 1995, voir plus bas, trouve ici sa réponse d'époque). On y trouve aussi `disbacon`/`bacon` (les outils repris par le projet `disbacon` de ce référentiel) et une version traduite en anglais de la doc XASM.
 - **[Takayuki Mizuno — kt.rim.or.jp/~tmizuno](http://www.kt.rim.or.jp/~tmizuno/pocket/library/sharp01.html)** — index de bibliothèque logicielle SHARP incluant XASM/DISASM12 (miroir des fichiers de Kako), l'assembleur alternatif **A62**/**MASSE** (Nmasu), le compilateur **VOGUE** — de **Narihito Kon** (Department of Computer Science, Tokyo Institute of Technology), 1991-1992. ✅ *Établi le 2026-09-14 par quatre documents d'époque, rangés hors dépôt, dans l'archive personnelle de J.-F. Albouy (dossier `vogue`) : `VOGUE.S` (« (c)1991/1992 Narihito Kon »), `VOGUE.DOC` (« Engineered by Narihito Kon. Tokyo/Saitama, Japan on 1991/1992 »), deux courriers des 25 et 27 août 1992 adressés à **Andrew Woods** à Curtin University (`VOGUE.MAI`, `VOGUE2.MAI` — « a compiler called "VOGUE", which I made ») et un article Usenet `comp.sys.handhelds` du 26 septembre 1992 (`VOGUE.NWS`). Le programme a été publié dans Pocket Computer Magazine (PJ). ⛔ Une version antérieure donnait son nom en kanji, « 契約 稔 » : aucun de ces documents ne porte de kanji pour son nom, et ceux-là signifient « contrat » et « Minoru » — nom retiré. Le `vogue` du corpus de `SC62015Disassembler` est ce même programme, **réassemblé en 2019** par J.-F. Albouy, ce qui avait fait attribuer le programme à l'auteur du listing.* ✅ **Et son nom en kanji est désormais sourcé : 近 成人.** La bibliographie de `PLINKC.DOC` (D. Mizobata, 1999) cite « 近 成人：PLINK ver 1.04 » et « 近 成人：ポケット・リンク、ポケコン・ジャーナル1990年 6月号、工学社 », et sa postface le nomme « 原作者の近成人氏 », l'auteur original — celui qui a **consenti à la publication d'une version modifiée**. La même documentation donne donc l'article fondateur de la norme des pilotes (`04` §2.1) et le kanji que ce référentiel avait dû retirer faute de source. Que ce Narihito Kon soit le « N. Kon » de XASM 1.0 et de `PLINK` est très probable, sans être écrit nulle part — `05-format-fichiers-et-xasm.md` §1, et **COMPO-System**/**SG** (TORO / 高橋 良和).
+- **TY-DOS** (Toshiro Yamaguchi, revue *PJ*, août-octobre 1988) et **TR-DOS V0.33** (T. Kobayashi
+  « Ryu », 1993) — `C:\Claude\TYDOS\` (manuel traduit `TYDOS.MAN`) et `C:\Claude\TRDOS\` (objets
+  d'origine, doc traduite `TRDOS.DOC.docx`, sources reconstituées à l'octet, CRC32 de la doc de 1993).
+  TR-DOS se dit « partiellement incompatible » avec TY-DOS : son service `IL` 8 sort du DOS là où
+  TY-DOS rend une erreur. Reprise en TR-DOS 2 / TY-COM 2 : `06` §3quater.
 - **History 1.11** (TORO, 1994) — `C:\Claude\HIS111\` : source commentée en japonais, binaire diffusé, notice (`history.doc`, traduite dans `History_v1.11_traduction_francaise.md`). Rappel des lignes du mode direct par le vecteur de l'éditeur ; « ne fonctionne pas sur E650/U6000 », dit la notice — et, mesuré en 2026, pas davantage sur PC-E500S sans adaptation (`03` §3bis).
 - **[TORO's Library — toro.d.dooo.jp](https://toro.d.dooo.jp/sle500.html)** — bibliothèque logicielle PC-E500 de TORO (高橋良和), dont **COMPO-System** (débogueur commande pour développement en langage machine sur E500), **Tmap** (« memory map creation », affiche l'information des slots système et des drivers — la source directe du nom du fichier de test `tmap.obj`/`TMAP2020.lst`) et **BASCOM** (compilateur BASIC autonome).
 - **[Electrelic — SC61860 & SC62015 (その1)](https://electrelic.com/electrelic/node/4232)** (H. Asano, 2024) — article de reconstruction pour le désassembleur *Macroassembler AS*, incluant la piste qui a permis de retrouver les deux manuels Sharp cités en §1 (liens Wayback Machine vers `sarnau.info`), et des références à d'autres bases documentaires (*ポケコン・マシン語ブック*, *ポケコンうらわざ大事典*).

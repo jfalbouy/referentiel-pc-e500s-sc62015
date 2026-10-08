@@ -1,6 +1,6 @@
 # Écosystème d'outils déjà réalisés (dans `C:\Claude`)
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-07*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-08*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce fichier répond directement à la demande initiale : « compléter ce que nous avons déjà réalisé » — il cartographie les projets existants, leur rôle, et comment ils s'articulent entre eux et avec le contenu des autres fichiers de ce référentiel.
 
@@ -37,6 +37,7 @@ Deux familles d'outils cohabitent : la chaîne **BASIC** (texte ↔ tokenisé �
 | **`HIS111`** / **`HISTDRV`** (`C:\Claude\HIS111`) | **History 1.11** (TORO, 1994) : l'original (`hist111.asm`, assembleur Katsuyō Kenkyū), sa conversion `history.asm` pour `xasm2026-4` (identique à `history.bin`, `05` §7ter), et **`HISTDRV`**, sa version **pilote de `S1:`** (`HISTORY.SYS`, device `HIST:`) : le TSR de TORO, étiquettes renommées, dans l'installateur de `BASEXT-DRV` ; tampon d'historique dans le bloc ; **version de la ROM lue à l'installation** pour servir l'E500 comme l'E500S (`03` §3bis). `outils/construire.py` importe `BASEXT-DRV/outils/reloc.py`. Dépôt privé `github.com/jfalbouy/sharp-pce500s-keyboard_history` (il porte le TSR de TORO). | 0.2 **validée sur PC-E500S réel** (installation, rappel, désinstallation) et sur émulateurs PC-E500S et PC-E500, le 2026-09-24. | `HISTDRV.ASM` → `HISTDRV.OBJ` / `.UU` + `HISTTEST.BAS` généré, par `outils/construire.py`. |
 | **`SC62015Disassembler/Samples/DEVICE9`** | **Sondes** du Function Driver (`SQR`, `ADDTEST`, `DIVTEST`, `MATTEST`), chacune avec son programme BASIC d'essai. | Validées sur PC-E500S et PockEmul, septembre 2026 ; les résultats sont consignés dans l'en-tête de chaque source. | Source `.ASM` → `.OBJ` / `.UU` + `.BAS` d'essai ; journal dans `12-extensions-basic.md`. |
 | **`PLINKC162`** | Driver IOCS résident (« Pocket Link Cache »), lecteur virtuel `L:` relié par liaison série à un serveur PC (`APLINKS`). ✅ **Auteurs, lus dans l'en-tête de la source A62** : PLINKC 1.62 est de **Daisuke Mizobata** (« Copyright (c) 1996,1997,1999 »), *based on* **PLINK.SYS 1.04**, « Copyright (c) 1990,93,94 by N.Kon » — le même N. Kon que XASM 1.0 (`05` §1). Exemple réel et complet de programme en langage machine + protocole. Le serveur a été **modernisé** : `APLINKS` 1.05 **décode** de lui-même en `.obj` les `.uue`/`.uux` reçus de la machine, et 1.06 **encode** au démarrage les `.obj` en `.uue` (`--uuencode`), ce qui joint le lecteur `L:` et l'enveloppe texte (`05` §5.1bis). ✅ **Et le pilote lui-même l'a été en octobre 2026** (`1.62-2026.1`, §3ter). | Archive historique (1999) restructurée pour publication : `original/` intact + `modernized/` + `NOTICE` ; dépôt public `github.com/jfalbouy/sharp-pce500-plinkc-`. | Source assembleur `PLINKC.asm`/`.BAS` ; protocole documenté dans `Anleitung.txt`. |
+| **`TYDOS`**, **`TRDOS`**, **`TRDOS2`**, **`TYCOM2`** (`C:\Claude`) | Le DOS de la machine. **TY-DOS** (T. Yamaguchi, revue PJ, 1988) et son shell **TY-COM**, sources reconstituées en 2019 ; **TR-DOS V0.33** (T. Kobayashi, 1993), TY-DOS rendu **résident** en pilote `DOS:` dans `S1:`, sources reconstituées le 2026-10-07 à l'octet (CRC32 de la doc de 1993) ; **TR-DOS 2** et **TY-COM 2.04** (2026-10-08), la suite (§3quater). | ✅ TR-DOS 2 et TY-COM 2.04 éprouvés sur émulateur et sur PC-E500S réel ; `DIR X:` reste à essayer avec un vrai CE-140F. |
 
 **Comment ils se répondent :** `SC62015Disassembler` utilise les mêmes tables de référence que XASM (`Data/OpcodeTable.json` dérive de la même documentation que la table d'opcodes XASM) et se valide contre des `.lst` **produits par XASM lui-même** sur des programmes réels (`register`, `tmap`, `vogue` — voir `Docs/Exemples/`). `xasm2026-4` se valide à son tour contre `xasm2026-1` en réassemblant les mêmes sources. `PLINKC162` est un cas d'usage réel qui mobilise à la fois l'assembleur (écrire le driver) et la structure IOCS documentée en `04-fcs-iocs.md` (installer un en-tête de driver, cf. `03-memoire-et-systeme-pc-e500s.md` §7). `BASEXT-DRV` en a repris le modèle d'installation après avoir mesuré l'échec de l'ajout en fin de chaîne (`03` §7bis), et a servi de banc d'essai à `xasm2026-4` : c'est la confrontation de ses objets au moteur C et à `reloc.py` qui a fait trouver les défauts de l'octet PRE et de `rel`.
 
@@ -102,6 +103,18 @@ source de l'auteur, qui **redonne à l'octet** le `PLINKC.OBJ` de 1999.
 
 ✅ Tout validé sur **PC-E500S réel** les 2026-10-06 et 10-07, `RESET` sans `OPEN` compris.
 
+
+### 3quater. ✅ TR-DOS 2 et TY-COM 2 — le DOS de 1993 repris (2026-10-07/08)
+
+| | Ce qui change | Fait système qu'il a fallu établir |
+|---|---|---|
+| **TY-COM 2** | les correctifs qu'EX_TYCOM posait en mémoire (touche OFF, clic, répétition, recherche le long du chemin, ` Driver ` dans DIR, `EXIT`) **écrits dans la source** ; `DIR X:` / `DIR Y:` (2.01-2.04) | ⛔ **le FCS refuse `X:`/`Y:`** (`04` §1) : `DIR X:` appelle directement le catalogue du pilote FDD, comme `FILES` ; il envoie `????????.???` et filtre lui-même, les substituts du lecteur n'appliquant pas les jokers |
+| **TR-DOS 2** | shell `TYCOM2.SYS` cherché le long du chemin (fini le `S1:EX_TYCOM` sans extension), message si introuvable, réentrée bornée à l'appel imbriqué, installation sûre, désinstallation `CALL &BE000"-U"`, V2.00 | insertion et retrait d'un pilote dans `S1:` (`03` §7bis), table de relocation **vérifiée par mesure** (`03` §7bis, « Quatre façons de reloger ») |
+| **`TR2REN`** | installe sous leur nom exact les fichiers venus du CE-140F de l'émulateur | `COPY`/`NAME` en mode direct seulement, `KEY 0` pour les faire taper, `COPY` sans `S1:` (`03` §7bis) |
+
+⚠️ **TY-COM cherche un fichier sous le nom exact tapé**, sans ajouter d'extension : `SHELL`, `PATH`,
+`INIT` s'appellent sans extension, alors que le CE-140F de PockEmul exige une extension sur `X:` — d'où
+le renommage. Procédure d'installation complète : `C:\Claude\TRDOS2\README.md`, « Installer ».
 ## 4. Documentation transverse
 
 | Élément | Contenu |
