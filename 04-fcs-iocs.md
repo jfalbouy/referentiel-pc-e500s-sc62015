@@ -151,10 +151,10 @@ code (identique à l'adresse du premier `CALL` près) :
 ✅ **Mis en œuvre** dans TY-COM 2.01 (`dir_fdd`), qui choisit la ligne par la version puis vérifie
 l'empreinte avant d'appeler. ⚠️ **Pas encore essayé sur machine** à la date de rédaction.
 
-> ⚠️ `Drivers-IOCS.md` §12 conclut qu'« un fichier sur disquette s'ouvre par les fonctions FCS
-> ordinaires, et c'est le FCS qui descend dans le driver ». Le test de `0E07D0h` dit le contraire pour
-> l'ouverture (`0E070Bh`). Les appels directs de `0DFCAAh` vers le pilote FDD qu'il cite restent à
-> situer : ils ne sont pas dans la table de répartition du FCS (`0E06DCh`).
+> ✅ `Drivers-IOCS.md` §12 concluait qu'« un fichier sur disquette s'ouvre par les fonctions FCS
+> ordinaires ». **Corrigé le 2026-10-08** : les appels de `0DFCAAh` qu'il citait sont l'instruction
+> BASIC `INIT` (token `1Dh`, `0DFC87h`), qui formate la disquette par les commandes `08h` et `09h` du
+> CE-140F (`0EB7EBh`, `0EB81Fh`) — pas le FCS.
 
 ### Codes d'erreur FCS (`C=1`, code retourné dans `A`)
 
