@@ -302,6 +302,84 @@ Chaque case = un glyphe ouvrant, **6** caractères (complétés par des espaces,
 
 **Clavier (device 1), `46H` `fkey_display`, lue en `0F1CFAh`** : le manuel ne cite aucun paramètre, la ROM teste `A` — `A = 1` affiche les libellés des touches de fonction en ligne 3 (fichier `FUNCKEY.`, `BFC45H`), toute autre valeur efface la ligne 3 (`49H`). Retenue armée si l'écran est en 4 lignes (`lcd_height` = 4) ou si le bit 2 de `BFC3FH` interdit l'affichage. ✅ Mesuré (`*FKD`, 2026-10-10).
 
+#### 2.4quater ⛔ « Display with guide line » n'a **qu'un seul émetteur** dans toute la ROM
+
+Relevé dans `rom83` le 2026-10-12 : `mv il,058h` suivi d'un `callf iocs_call` n'apparaît **qu'une
+fois** — en `0F1D2Eh`, **à l'intérieur de `fkey_display`**, c'est-à-dire de la commande `46H` du
+pilote **clavier**.
+
+> ⛔ **La « ligne de guide » du manuel et la barre des touches de fonction sont la même chose.** Il
+> n'existe pas, dans la machine, de « barre de menu » distincte : l'écran `MENU` affiche cette
+> barre-là, par ce chemin-là. C'est ce qui rend la commande exploitable — ce que la ROM se passe à
+> elle-même, un programme peut se le passer aussi.
+
+Ce que `fkey_display` fait, désassemblé :
+
+```asm
+        cmp     [lcd_height],004h       ; ⛔ refus si l'ecran est en 4 lignes
+        jrnc    LOC_F1D56
+        test    [funckey_flag],004h     ; ⛔ refus si le bit 2 de 0BFC3Fh est arme
+        jrnz    LOC_F1D56
+        cmp     a,001h                  ; A <> 1 : efface la ligne 3 (049h clear_line)
+        jrnz    LOC_F1D40
+        ...
+        mv      a,[0BFC40h]
+        mv      b,a                     ; B <- le selecteur de jeu de libelles
+        mv      a,005h                  ; A = 5 cases
+        mvw     (bl),00300h             ; colonne 0, ligne 3
+        mv      il,058h
+        mvw     (cl),00000h
+        callf   iocs_call
+        or      [funckey_flag],001h     ; bit 0 = « la barre est affichee »
+        rc
+        retf
+```
+
+**Deux bits d'état et un sélecteur**, que le carnet ne portait pas :
+
+| Adresse | Ce qu'elle fait |
+|---|---|
+| `0BFC3Fh` bit 2 | **interdit** l'affichage — `fkey_display` refuse, retenue armée |
+| `0BFC3Fh` bit 0 | ✅ **posé** quand la barre vient d'être affichée, **effacé** quand la ligne 3 est effacée ou le refus prononcé : c'est l'état « la barre est là » |
+| `0BFC40h` | ✅ **sélecteur du jeu de libellés** (`< 1` → `013h`, sinon `033h`, passés à `0F6402h`) **et** passé tel quel en `B` à `58h` — donc son bit 0 choisit aussi crochets ou parenthèses. Sans nom dans `pce500.inc` |
+
+**Le chemin depuis l'écran `MENU`** : `0F931Ah` est le secours « afficher la barre sauf si l'écran
+est à 4 lignes » (`cmp [lcd_height],004h`, puis `A = 1`, commande `46h` par `IOCSKEY 0F3EB9h`). Il a
+deux appelants, `0F9343h` et `0FA980h` ; `0F9343h` est lui-même appelé de trois sites de la région
+du MENU PRINCIPAL et, **quand la barre a été refusée, force l'écran à 4 lignes** et remet `0BFC40h`
+à zéro.
+
+⚠️ **Ce qui n'est pas établi** : le chemin pas à pas depuis la frappe de la touche `MENU` (code
+matriciel `06h`, §2.4bis) jusqu'à ces appels — il traverse le MENU PRINCIPAL (`0F9AA6h`) et je ne
+l'ai pas suivi. Ce qui est mesuré, c'est **l'unicité de l'émetteur** et **les paramètres**.
+
+##### L'exploiter : en ASM, et en BASIC malgré la porte
+
+⛔ **`CALL &FFFDC` ne suffit pas.** La porte ne transporte que `(cl)`, `(ch)` et `IL` (§2.2), quand
+`58h` veut en plus `(bl)`, `(bh)`, `A`, `B` et `X`. Il faut donc un module en langage machine — et
+les deux voies existantes le font de la même façon, avec **les octets mêmes de la ROM** :
+
+```asm
+        mv      x,libelles              ; les chaines, chacune terminee par 0FFh
+        mvw     (bl),00300H             ; colonne 0, ligne 3  -- 30 CD D4 00 03
+        mv      ba,00005H               ; A = 5 cases, B = 0 : crochets, ligne effacee
+        mvw     (cl),00000H             ; device 0 = ecran
+        mv      il,058H                 ;                     -- 09 58
+        callf   iocs_call
+        rc                              ; ⛔ 058h ne fixe pas la retenue
+        retf
+```
+
+| Voie | Où | Comment |
+|---|---|---|
+| **ASM** | `Documentation/GUIDE.ASM`, 60 octets | assemblé ; `LOAD M` puis `CALL &BF000` |
+| **BASIC** | `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS` | pose **26 octets** en `0BEF60h` et les libellés en `0BEF80h`, puis `CALL &BEF60` ; repli en `LOCATE`/`PRINT` si la zone langage machine n'est pas réservée |
+
+✅ **Les trois encodages concordent à l'octet** — `30 CD D4 00 03`, `09 58`, `05 E8 FF 0F` — entre la
+ROM (`0F1D29h`), `GUIDE.OBJ` et les `POKE` de `*MNU`. ⚠️ `GUIDE.ASM` appelle `58h` **directement** :
+il ne refait aucun des trois contrôles de `fkey_display`, donc **l'écran doit être en 3 lignes**
+(`CONSOLE 0`), faute de quoi la barre s'écrit par-dessus une ligne de texte.
+
 **Clavier : ce que voit le BASIC** — ✅ mesuré le 2026-10-10 (émulateur ; `C:\Claude\ROUTINES\MEMCHK\KEYCODE.BAS`) :
 
 | Lecture | `PF4` | `CTRL`+`PF4` | `PF5` | `CTRL`+`PF5` | flèches, `C-CE` |
