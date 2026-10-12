@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-08*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-12*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -273,19 +273,116 @@ Illustration des fonctions « `41H`-`7FH` propres au périphérique », ici pour
 | `3FH` | Formatage — spécifique au PC-E500. |
 | `40H` | Initialisation du driver LCD. |
 | `41H` | Sortie d'un caractère à une position arbitraire. |
-| `42H` | Sortie d'une chaîne à une position arbitraire. |
+| `42H` | Sortie d'une chaîne à une position arbitraire : `(bl)`/`(bh)`, `X` = chaîne, `Y` = longueur. ✅ Mesuré (2026-10-10, `*PSTR` de `ROUTINES.BAS`) : **ne déplace pas le curseur et ne fait pas défiler** — 40 caractères tiennent sur la dernière ligne ; coupe au bord droit (retenue armée s'il reste des caractères). |
 | `44H` | Positionnement du curseur. |
-| `45H` | Type d'affichage du curseur. |
+| `45H` | Type d'affichage du curseur : `A` bit 5 = affiché, bit 3 = clignotant, bits 2-0 = forme (0 souligné, 1 double souligné, 2 *full mark*, 3 *full space*, 4 marque d'insertion) ; `A = 0` le cache. ✅ Pavé affiché (mesuré 2026-10-10). |
 | `46H` | Affichage d'un symbole. |
 | `47H`/`48H` | Défilement de `n` lignes vers le haut/bas. |
 | `49H` | Effacement d'une ligne. |
 | `4AH` | Affichage d'un motif 8 points. |
+| `52H` | Effacement à partir d'une position : `(bl)`/`(bh)` = départ, `A` = nombre de caractères. ✅ Lu (`0F2B85h`) et mesuré : **passe à la ligne suivante** en fin de ligne (`(bl)` ← 0, `(bh)` + 1) et s'arrête à la ligne 4 ; `A = 0` ne fait rien. |
 | `51H` | `clear_disp` — effacement de l'affichage ; ✅ n'efface en fait que les lignes `0`..`lcd_height−1` (`BFC9EH`, `03` §4 ; `0F2771h`), mesuré sur machine par `CLS`. |
 | `53H` | Absente du manuel, jamais émise par `rom83` ; un relevé antérieur disait « suppression d'une ligne », rien ne l'étaye. |
 | `55H`/`56H` | `pattern_read`/`pattern_write` — motif de points d'une ligne (`(bh)` = ordonnée) vers/depuis la mémoire externe (`X`, **240 octets**). ✅ Employées avec `49H` par le filtre de `XCONSOLE` pour défiler une partie seulement de l'écran. |
-| `58H` | `guide_line` — chaînes encadrées d'un guide ; c'est par elle que `fkey_display` (clavier, `46H`) dessine les libellés des touches de fonction. |
+| `58H` | `guide_line` — chaînes encadrées d'un guide ; c'est par elle que `fkey_display` (clavier, `46H`) dessine les libellés des touches de fonction, et la barre `[BASIC ][ CAL  ][MATRIX][ STAT ][ ENG  ]` de la touche `MENU` (libellés en `0F92AFh`). Voir ci-dessous. |
 
 *(Noms et descriptions de `41H`-`58H` : `SC62015Disassembler/Data/FCSFunctions.json`, qui porte toute la liste.)*
+
+**`58H` lue dans la ROM (`0F2C90h`), mesurée le 2026-10-10** — le manuel (p. 41) est inexact sur deux points :
+
+| Entrée | Rôle |
+|---|---|
+| `(bl)`, `(bh)` | colonne et ligne de la première case |
+| `A` | nombre de chaînes |
+| `B` bit 7 | `0` = efface d'abord la ligne `(bh)`, `1` = la garde. Le manuel écrit « bit 8 » : c'est le bit 8 de **`BA`** |
+| `B` bit 0 | `0` = crochets, `1` = parenthèses — glyphes spéciaux `B7h`/`B8h` ou `C2h`/`C3h` de la police en `0306C0h` |
+| `X` | les chaînes, chacune terminée par `FFh` ; un `FEh` en tête est sauté |
+
+Chaque case = un glyphe ouvrant, **6** caractères (complétés par des espaces, le reste ignoré — le manuel dit 7), un glyphe fermant : 8 colonnes, 5 cases par ligne. Le guide de la ROM finit sur `retf` sans fixer la retenue : l'appelant fait `rc` (comme `fkey_display` en `0F1D3Eh`). Emploi depuis le BASIC : `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS`.
+
+**Clavier (device 1), `46H` `fkey_display`, lue en `0F1CFAh`** : le manuel ne cite aucun paramètre, la ROM teste `A` — `A = 1` affiche les libellés des touches de fonction en ligne 3 (fichier `FUNCKEY.`, `BFC45H`), toute autre valeur efface la ligne 3 (`49H`). Retenue armée si l'écran est en 4 lignes (`lcd_height` = 4) ou si le bit 2 de `BFC3FH` interdit l'affichage. ✅ Mesuré (`*FKD`, 2026-10-10).
+
+**Clavier : ce que voit le BASIC** — ✅ mesuré le 2026-10-10 (émulateur ; `C:\Claude\ROUTINES\MEMCHK\KEYCODE.BAS`) :
+
+| Lecture | `PF4` | `CTRL`+`PF4` | `PF5` | `CTRL`+`PF5` | flèches, `C-CE` |
+|---|---|---|---|---|---|
+| `INKEY$ &1` | `F4h` | `F4h` | `F5h` | `F5h` | `05h` bas, `04h` haut, `0Eh` droite, `0Fh` gauche ; `02h` |
+| `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
+
+- `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
+- Lire `CTRL` dans la matrice depuis le BASIC (`POKE &F0,1` puis `PEEK &F2` bit 7) n'a **pas** marché pendant l'appui d'une autre touche, même en 10 lectures : `CTRL` seul donne bien `80h`, mais la ROM rebalaie le clavier (au repos elle laisse `KO` à 0, `0F1D7Dh`). Piste restante : IOCS clavier `43H` (lecture avec `SHIFT`/`CTRL` traités) depuis un code machine.
+
+#### 2.4bis ✅ Pourquoi aucune des deux fonctions ne voit tout — les quatre tables, relevées
+
+Le relevé ci-dessus disait **ce que** les deux fonctions rendent. Les tables disent **pourquoi**, et
+elles se lisent dans les images (2026-10-12).
+
+**Le manuel technique distingue trois représentations** d'une touche (chapitre 3, « *No. 01 Key
+Driver (STDI: KYBD:)* », pp. 43-48) :
+
+| Représentation | Où elle vit |
+|---|---|
+| **position matérielle** | les ports `KOL` `(0F0h)`, `KOH` `(0F1h)`, `KIL` `(0F2h)` — une ligne strobée, une ligne lue |
+| **code matriciel** | rendu par IOCS `041h matrix_read`, bits 0-6 de `A` (bit 7 = touche relâchée) |
+| **code caractère** | ce que voit le programme, après conversion **par une table** |
+
+C'est le troisième passage qui sépare les deux fonctions — **et il n'y a pas une table, il y en a
+sept** :
+
+- le **pilote** en a **six**, déclarées dans la System Data Area en `0BFC2Dh`-`0BFC3Eh` (six
+  pointeurs de 3 octets vers des tables de `062h` = 98 octets) : code d'**1 octet** et de **2
+  octets**, chacun en **normal / `SHIFT` / `CTRL`** (`03` §3) ;
+- **`INKEY$` n'en emploie aucune.** Il a la sienne, `0F9C5Dh`, en ROM, **citée nulle part ailleurs**
+  — et **sans variante `SHIFT` ni `CTRL`**.
+
+**Les quatre tables à un octet, au même index** (PC-E500S 8.3 ; pilote dans `S3EXT`) :
+
+| Code matriciel | `INKEY$` `0F9C5Dh` | pilote `0307A4h` | `SHIFT` `03092Ch` | `CTRL` `030868h` |
+|---|---|---|---|---|
+| `31h` — `A` | `41h` `A` | `41h` `A` | `5Bh` `[` | `01h` |
+| `16h` — `PF4` | **`F4h`** | `00h` | `00h` | `00h` |
+| `1Dh` — flèche ← | **`0Fh`** | `1Dh` | `00h` | `00h` |
+| `30h` — espace | `20h` | `20h` | `20h` | `00h` |
+
+⛔ **Trois choses s'en déduisent, et elles répondent chacune à une observation du relevé :**
+
+1. **`INKEY$` ignore `CTRL` par construction, pas par choix** : sa table n'a tout simplement pas de
+   variante. Une seule table, un seul résultat.
+2. **La table `CTRL` à un octet est vide sous `30h`.** Sous `CTRL`, une touche de fonction ou une
+   flèche ne peut donc rien rendre par cette voie — elle passe par la table **à deux octets**, d'où
+   le `00h` + code mesuré. Et la table `0308CAh` donne, pour `PF1`…`PF5` (codes matriciels
+   `13h`-`17h`), exactement **`53h 54h 55h 56h 57h`** : ✅ le `00h`+`56h` mesuré sur machine le
+   2026-10-10 **se retrouve dans l'image**, à l'index près.
+3. **Les PF seules sous `INPUT$` rendent leur texte programmé** parce que le code à deux octets
+   `00h`+`16h` que rend le pilote est intercepté **au-dessus de lui**, par l'éditeur du BASIC — qui
+   lit le clavier *comme un fichier* (`0F3972h` : `(cl) = 1` = `STDI:`, FCS `005h read_byte`).
+
+> ⚠️ **La régularité « `SHIFT` = +`20h`, `CTRL` = +`40h` » n'est vraie que par endroits** : elle
+> tient sur les touches de fonction et les flèches (`13h`-`17h` → `33h`-`37h` / `53h`-`57h` ;
+> `1Ch`-`1Fh` → `3Ch`-`3Fh` / `5Ch`-`5Fh`), mais **20 des 41** entrées `SHIFT` et **36 des 60**
+> entrées `CTRL` seulement la suivent — le bloc katakana `51h`-`61h` répond à une autre logique.
+> Ce sont des **tables**, pas une formule.
+
+#### 2.4ter Le partage, en une ligne : il faut les deux fonctions
+
+| | `INKEY$` | `INPUT$` |
+|---|---|---|
+| voie | IOCS `041h matrix_read`, device 1 (`0F9FC4h`) | FCS `005h read_byte` sur `STDI:` — le clavier **comme un fichier** |
+| table | **la sienne**, `0F9C5Dh`, une seule | **les six** du pilote, dans la SDA |
+| `SHIFT` / `CTRL` | ⛔ jamais | ✅ tables dédiées, codes à deux octets |
+| touches `PF` | ✅ `0F1h`-`0F5h` | ⛔ texte programmé (sauf avec `CTRL` : `00h`+`53h`-`57h`) |
+| flèches | `0Eh` `0Fh` `04h` `05h` | `1Ch` `1Dh` `1Eh` `1Fh` |
+| attente | **non bloquant** (`INKEY$ &H1`) | **bloquant** |
+
+> ⛔ **Un menu qui réagit aux `PF` *et* aux combinaisons `CTRL` a besoin des deux fonctions.** Ce
+> n'est pas une maladresse de l'une ou de l'autre : elles ne lisent pas la même chose au même
+> endroit. `INKEY$` lit **la matrice**, `INPUT$` lit **le pilote**.
+
+✅ **Programme de démonstration** : `C:\Claude\ROUTINES\MEMCHK\CLAVIER.BAS`. Il lit les six pointeurs
+dans la SDA, affiche pour un même code matriciel les quatre réponses, puis fait lire **la même
+touche** par les deux fonctions. ⚠️ Il **vérifie la version de ROM** : l'adresse `0F9C5Dh` de la
+table d'`INKEY$` n'est établie que sur la **8.3**, et il le dit au lieu de deviner. `KEYCODE.BAS`,
+dans le même dossier, reste l'explorateur libre de codes de touches.
 
 Le manuel documente de la même façon chaque autre driver standard (clavier, SIO, imprimante, cassette, carte mémoire, disquette — voir la liste des en-têtes en `03-memoire-et-systeme-pc-e500s.md` §7) ; le détail complet des ~10 drivers dépasse le cadre de ce résumé et reste consultable dans le manuel original (`Docs/Doc technique/TechnicalReferenceManualPC-E500.pdf` et sa version mise en forme dans `Mise en forme documents SHARP/`).
 
@@ -317,6 +414,10 @@ Détail, mesures et pièges : `12-extensions-basic.md` §13 (famille 0) et §17 
 | `callf iocs_call` (`FFFE8H`) | depuis le code machine : `(cl)`, `(ch)`, `IL`, puis les registres de la commande | répartition vers le driver par la chaîne d'en-têtes |
 | `CALL &FFFDC` (`iocs_call3`) | **depuis le BASIC** : `POKE &BFE00,cl,ch,il` | `0EF01Ah` : `mv il,[0BFE02h]` / `mvw (cl),[0BFE00h]` / `callf iocs_call` |
 | `CALL &FFFD8` (`secure_work_call`) | depuis le BASIC : `POKE &BFE03,` adresse (3 o) `,` valeur (3 o) | `0F964Fh` : relit les six octets, puis **IOCS `042H` `secure_work`** du device 8 |
+
+> ⛔ **Depuis le BASIC, `(bl)` ne se pose pas par `POKE &D4`** — mesuré le 2026-10-10 : `POKE &BFE00,…:POKE &D4,30,0,0,0:CALL &BFE00` sur **une seule ligne**, la commande `52H` a vu `(bl)` = 0. `&D5` (`bh`) et `&D6`/`&D7` (`cx`) ont tenu dans les mêmes conditions. Charger `bl`/`bh` **dans le code** appelé (`30 CD D4 lo hi` = `mvw (bl),hilo`), comme le font `*IOCS`, `*MNU` et `*PSTR` de `ROUTINES.BAS`.
+>
+> ⚠️ Le manuel (p. 31) ne documente que `BFE00H`-`BFE02H`. Au-delà, c'est le brouillon de la ROM (`03` §4, ligne `BFE00`) : un petit code d'appel peut y être posé et exécuté sur la même ligne, mais pas des données qui doivent survivre ; au-delà de `BFE0DH`, les placer dans la zone langage machine.
 
 > ⚠️ `CALL &FFFDC` ne transmet que trois registres : il ne convient qu'aux commandes qui n'attendent rien d'autre, ou dont les opérandes sont déjà en place — c'est le cas des matrices, rangées dans des tableaux BASIC. **Qu'il suffise effectivement pour la famille 1 n'est pas encore mesuré** (`12-extensions-basic.md` §16).
 
