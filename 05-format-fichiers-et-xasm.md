@@ -156,6 +156,19 @@ C'est celle des sondes de `SC62015Disassembler/Samples/DEVICE9/` et du module BA
 >
 > Établi en septembre 2026 sur les douze artefacts de TY-DOS, puis sur les sondes de `DEVICE9` (commit « les cinq autres .uu portaient un nom en minuscules »).
 
+## 4bis. Fichier BASIC en ASCII pour la machine — la fin dépend du lecteur
+
+✅ Mesuré sur PC-E500S et PockEmul (octobre 2026) :
+
+| Chargé par | Fin du fichier | Sinon |
+|---|---|---|
+| `L:` (PLINKC + APLINKS) | `0D 0A 1A` | *Input past end* après un chargement pourtant complet |
+| `X:` (CE-140F, réel ou émulé) | `0D 0A`, **sans** `1Ah` | *I/O error*, puis lecteur inutilisable (émulateur) |
+
+Les fichiers écrits par la machine suivent la même règle (ASCII sur `L:` : `0D 0A 1A` ; sur CE-140F : `0D 0A`). Les outils du PC (renuméroteur, `xasm2026-4 -B`, éditeurs) ne posent pas de `1Ah` : le rajouter après chaque génération pour `L:`, et livrer une copie sans `1Ah` pour le CE-140F (convention : sous-dossier `CE-140F\`). Pour concaténer deux tels fichiers sous Windows : `copy /a`, pas `copy /b` (qui laisserait un `1Ah` au milieu).
+
+⚠️ Second piège, propre au CE-140F de PockEmul : une ligne dont la somme des octets, `CR`/`LF` compris, vaut `1Ah` tronque la sauvegarde texte sans erreur (`13-routines-reutilisables.md` §2.7, `C:\Claude\Bugs emulateur PockEmul\Bug CE-140F sauvegarde texte`). Vérifier les sommes avant de livrer.
+
 ## 5. Formats de fichier objet
 
 ### 5.1 Écriture (XASM) — option `-T`
