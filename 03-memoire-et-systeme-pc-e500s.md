@@ -126,10 +126,50 @@ la ROM** (§8) : `HISTDRV` la lit à l'installation.
 
 | Adresse | Sigle | Description |
 |---|---|---|
-| `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
+| `BFC09`–`BFC19` | `ldAdSlot2`/… | **Table des trois lecteurs mémoire** — adresse de tête (3 octets) puis capacité en blocs de 2 Ko : `BFC09` `ldAdSlot2` / `BFC0C` `cpSlot2` = **`S3:`** (ROM, `C0000`, `&40`) · `BFC0F` `ldAdSlot1` / `BFC12` `cpSlot1` = **`S2:`** (carte, `40000`, `&80` = 256 Ko) · `BFC14` `ctrlCRAM` (carte insérée — ✅ **précisé le 2026-10-12, voir ci-dessous**) · `BFC15` `ldAdSlot0` / `BFC18` `cpSlot0` = **`S1:`** (RAM interne, `80000`, `&80` = 256 Ko sur E500S ; `B8000` sur PC-E500). ✅ La ROM les lit **par numéro de lecteur** — `0F02B7h` `mv y,[0BFC15h]` pour le lecteur 0, `0F02CBh` `[0BFC0Fh]` pour le 1, `0F02D5h` `[0BFC09h]` pour le 2 : c'est ce qui nomme `S1:` la RAM interne. ⛔ Une version antérieure faisait commencer la table en `BFC15` et la prolongeait jusqu'à `BFCDE`. |
 | `BFC1B` | `s1_tail` | **Fin de la chaîne des blocs de `S1:`, + 1** (3 octets). 📖 Écrite par `SUB_F029D` (`0F02A8h`), et seulement pour le lecteur 0, par les commandes du device 6 qui changent la chaîne — `42h`, `45h`, `46h`, `47h`, `48h`, plus trois appels au-delà de `0F0A63h` (table de répartition en `0F004Fh`, commandes `3Fh`-`48h`) ; relue en `0E0571h`, où elle est comparée à `[s1_btm]` — vraisemblablement pour qu'une réservation ne morde pas sur la chaîne — et en `0FB630h`. Nom et rôle donnés par E. Kako (`EXTSLOT`, 1991 : « adresse de fin de S1: », §7bis). ✅ **Un installateur qui décale les blocs à la main ne la met pas à jour** — ni `EXTSLOT`, ni `PLINKC`, ni `BASEXT-DRV`. Mesuré sur émulateur le 2026-09-27 : retard exact de la taille du pilote, rattrapé au premier `RUN` (§7bis). Ajoutée le 2026-09-27 à `Data/SystemAddresses.json`, `pce500.inc` régénéré. |
 | `BFC27`/`BFC28` | `SCRNX`/`SCRNY` | Prochaine coordonnée d'affichage sur `STDO:`/`SCRN:`. |
 | `BFC2A` | `LINPTN` | Cadre de points affiché dans une boîte 16 points. |
+✅ **La table est régulière : trois entrées de SIX octets** — tête (3) + capacité (2) + **un
+octet de drapeaux pris à l'offset `+05h` de l'en-tête du média** (relevé le 2026-10-12 dans
+`rom83`). C'est ce sixième octet que le carnet nommait `ctrlCRAM` pour la carte, sans dire d'où il
+vient :
+
+| Lecteur | tête | capacité | drapeaux | Sites qui le citent dans `rom83` |
+|---|---|---|---|---|
+| `S3:` ROM | `BFC09` | `BFC0C` | `BFC0E` | **aucun** — la ROM n'est pas initialisée ainsi |
+| `S2:` carte | `BFC0F` | `BFC12` | **`BFC14`** | **un seul**, `0F0B9Eh`, en **écriture** |
+| `S1:` interne | `BFC15` | `BFC18` | `BFC1A` | quatre, dont un **test du bit 1** en `0F0B16h` |
+
+Les deux routines d'initialisation se répondent mot pour mot — `0F0B5Ch` pour `S1:`, `0F0B89h`
+pour `S2:` :
+
+```asm
+        mv      x,040000h               ; la carte
+        mv      [s2_top],x
+        mv      ba,[x+002h]             ; capacite, deux octets du media
+        mv      [s2_cap],ba
+        call    SUB_F0E1F
+        mv      a,[x+005h]              ; l'octet de drapeaux du media
+        mv      [0BFC14h],a             ; <- ctrlCRAM
+```
+
+⚠️ **« Carte insérée » est donc une lecture, pas une mesure.** `BFC14` reçoit **l'octet `+05h` de
+l'en-tête du média**, pas un booléen fabriqué par la ROM : sur une carte réelle
+(`Samples/Extraction/s2-1.bin`, en-tête `10 12 80 00 00 01`) il vaut `01h`. Pour `S1:`, la ROM
+**force** les deux bits bas de cet octet à `01` à l'initialisation (`and a,0FCh` / `or a,001h`) et
+le réécrit dans le média avant de le copier en `BFC1Ah` — ce qui en fait bien un **champ de
+drapeaux**, dont le bit 1 au moins est consulté ailleurs.
+
+⛔ **Et `BFC14` n'a aucun lecteur par adresse absolue** dans `rom83` ni dans `S3EXT`, alors que son
+homologue `BFC1Ah` en a quatre. ⚠️ Cela ne prouve pas qu'il n'est jamais lu — un accès indexé
+n'apparaîtrait pas dans une recherche d'adresse — mais le témoin positif existe : partout ailleurs,
+cette table se lit **par adresse absolue**. Si quelque chose teste « une carte est-elle là », ce
+n'est pas par cet octet-ci.
+
+⚠️ `BFC14` et `BFC1A` **ne sont pas dans `pce500.inc`** : le carnet
+(`Data/SystemAddresses.json`) ne les porte pas encore.
+
 | `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). ✅ Six pointeurs, dans l'ordre de `pce500.inc` : `keytbl_1b`, `keytbl_2b`, `keytbl_1b_shift`, `keytbl_2b_shift`, `keytbl_1b_ctrl`, `keytbl_2b_ctrl`, déposés par la commande clavier `3Fh` depuis `0F1C6Dh` (`rom83`) : `0307A4h`, `030806h`, `03092Ch`, `03098Eh`, `030868h`, `0308CAh` — **l'ordre en mémoire (S3EXT) n'est pas celui des pointeurs**. Dans la table CTRL à 2 octets, ← (code matriciel `1Dh`) donne `5Dh` et → (`1Ch`) `5Ch` ; les six tables se retrouvent à l'identique dans `rom53` (à partir de `0F3422h`). |
 | `BFC6D` | `FHANDLE` | Table des handles de fichiers ouverts. |
 | `BFC7D` | `DEFDRV` | Nom du lecteur par défaut (7 octets, ex. `F:____0`). |

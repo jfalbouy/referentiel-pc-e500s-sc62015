@@ -1,6 +1,6 @@
 # Routines réutilisables — ce qu'on ne devrait plus jamais réécrire
 
-*Rédigé le 2026-09-28 — mis à jour le 2026-09-30*
+*Rédigé le 2026-09-28 — mis à jour le 2026-10-12*
 
 > Voir `00-index.md` pour la vue d'ensemble. Ce chapitre rassemble des routines prêtes à l'emploi
 > pour écrire un nouveau programme : celles que la **ROM offre déjà** — et qu'il serait absurde de
@@ -1584,7 +1584,36 @@ la même ligne, la position dans le programme — et **aucune mesure ne les sép
 `TROUTRE-2.TXT` est conservé avec le défaut ; il sera repris si le symptôme revient. Une anomalie
 qu'on cesse d'observer n'est pas une anomalie résolue.
 
-##### ✅ Le mode 6 — les écritures par le FCS, et une ligne qui se vérifie toute seule
+##### ⛔ Un quatrième défaut, trouvé le 2026-10-12 — et le banc ne pouvait pas le voir
+
+`is_digit` a été réécrit le 2026-10-01 pour la lisibilité : ses littéraux hexadécimaux sont devenus
+des littéraux de caractère. **Un octet a changé de valeur au passage.**
+
+```asm
+        cmp     a,'9'                   ; ⛔ etait 03Ah
+        jrnc    id_non                  ; > '9'   <- le commentaire dit >
+```
+
+`cmp` suivi de `jrnc` saute quand **`A ≥ n`**. Avec `03Ah` (`'9'+1`), le chiffre `9` passait ; avec
+`039h`, **`'9'` lui-même était rejeté**. `is_digit` ne reconnaissait plus le neuf, et `ex_lire`,
+qui s'en sert, s'arrêtait dessus.
+
+> **C'est la convention que le fichier emploie partout ailleurs**, et `upcase` l'écrit en toutes
+> lettres : `cmp a,07BH` avec le commentaire `'z'+1`. La forme lisible et juste est donc
+> `cmp a,'9'+1`, qui redonne `60 3A`.
+
+⚠️ **Et le banc ne pouvait pas le trouver** : ses deux jeux d'essai étaient `"  12345X"` et
+`"1048576"` — **aucun ne contient de 9**. Le §5.2 déclarait `ex_lire` ✅ éprouvé, et il l'était :
+sur des données qui ne touchaient pas le défaut. Les données d'essai disent désormais `"  90123X"`,
+qui commence par le chiffre en cause.
+
+> ⛔ **La leçon, et elle vaut au-delà de cette routine.** Le défaut n'a pas été trouvé par le banc
+> mais par un **contrôle de non-régression** : en régénérant `pce500.inc`, j'ai comparé les objets
+> avant et après, et l'un d'eux avait changé. L'include était innocent — c'est la comparaison qui a
+> révélé une édition de la veille. **Un objet qu'on recompile sans comparer ne dit rien ; comparé,
+> il dit tout ce qui a bougé depuis.**
+
+#### ✅ Le mode 6 — les écritures par le FCS, et une ligne qui se vérifie toute seule
 
 ```
 1048575
