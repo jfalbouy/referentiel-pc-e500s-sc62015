@@ -372,13 +372,25 @@ les deux voies existantes le font de la même façon, avec **les octets mêmes d
 
 | Voie | Où | Comment |
 |---|---|---|
-| **ASM** | `Documentation/GUIDE.ASM`, 60 octets | assemblé ; `LOAD M` puis `CALL &BF000` |
+| **ASM** | `Documentation/GUIDE.ASM`, 60 octets | ✅ **éprouvé sur PC-E500S le 2026-10-12** ; `LOAD M` puis `CALL &BF000` |
 | **BASIC** | `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS` | pose **26 octets** en `0BEF60h` et les libellés en `0BEF80h`, puis `CALL &BEF60` ; repli en `LOCATE`/`PRINT` si la zone langage machine n'est pas réservée |
 
 ✅ **Les trois encodages concordent à l'octet** — `30 CD D4 00 03`, `09 58`, `05 E8 FF 0F` — entre la
 ROM (`0F1D29h`), `GUIDE.OBJ` et les `POKE` de `*MNU`. ⚠️ `GUIDE.ASM` appelle `58h` **directement** :
 il ne refait aucun des trois contrôles de `fkey_display`, donc **l'écran doit être en 3 lignes**
 (`CONSOLE 0`), faute de quoi la barre s'écrit par-dessus une ligne de texte.
+
+✅ **Essai sur PC-E500S réel, 2026-10-12** — `LOAD M "GUIDE.OBJ"` puis `CALL &BF000` rend :
+
+```
+[BASIC ][CAL   ][MATRIX][STAT  ][ENG   ]
+```
+
+Trois choses s'y vérifient d'un coup : **une commande du device 0 s'appelle depuis un simple `CALL`
+du BASIC** sans passer par le pilote clavier ni par aucun des contrôles de `fkey_display` ; les
+cases font bien **six** caractères et non sept, `MATRIX` les occupant tous ; et **cinq cases de huit
+colonnes remplissent exactement la ligne de 40**. La barre de la machine est donc reproductible à
+l'identique par un programme — c'est le même appel, aux mêmes octets, avec d'autres libellés.
 
 **Clavier : ce que voit le BASIC** — ✅ mesuré le 2026-10-10 (émulateur ; `C:\Claude\ROUTINES\MEMCHK\KEYCODE.BAS`) :
 
