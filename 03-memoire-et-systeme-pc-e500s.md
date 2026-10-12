@@ -167,8 +167,11 @@ n'apparaîtrait pas dans une recherche d'adresse — mais le témoin positif exi
 cette table se lit **par adresse absolue**. Si quelque chose teste « une carte est-elle là », ce
 n'est pas par cet octet-ci.
 
-⚠️ `BFC14` et `BFC1A` **ne sont pas dans `pce500.inc`** : le carnet
-(`Data/SystemAddresses.json`) ne les porte pas encore.
+✅ **Les trois sont entrés au carnet le 2026-10-12** — `s3_flags` (`BFC0E`), `s2_flags` (`BFC14`)
+et `s1_flags` (`BFC1A`) sont dans `Data/SystemAddresses.json`, et `pce500.inc` régénéré les porte
+(293 `equ`, propagé aux 25 copies, objets vérifiés identiques à l'octet). ⚠️ La description de
+`s3_flags` dit ce qu'elle doit dire : **sa place se déduit de la régularité de la table, pas d'un
+accès mesuré** — rien ne le cite.
 
 | `BFC2D`–`BFC41` | — | Table de conversion des codes clavier (normal / SHIFT / CTRL), 1 et 2 octets, + *hook* de la routine de traitement clavier (`&F1B4D` par défaut). ✅ Six pointeurs, dans l'ordre de `pce500.inc` : `keytbl_1b`, `keytbl_2b`, `keytbl_1b_shift`, `keytbl_2b_shift`, `keytbl_1b_ctrl`, `keytbl_2b_ctrl`, déposés par la commande clavier `3Fh` depuis `0F1C6Dh` (`rom83`) : `0307A4h`, `030806h`, `03092Ch`, `03098Eh`, `030868h`, `0308CAh` — **l'ordre en mémoire (S3EXT) n'est pas celui des pointeurs**. Dans la table CTRL à 2 octets, ← (code matriciel `1Dh`) donne `5Dh` et → (`1Ch`) `5Ch` ; les six tables se retrouvent à l'identique dans `rom53` (à partir de `0F3422h`). |
 | `BFC6D` | `FHANDLE` | Table des handles de fichiers ouverts. |
