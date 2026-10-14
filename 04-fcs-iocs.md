@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-12*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-14*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -298,7 +298,7 @@ Illustration des fonctions « `41H`-`7FH` propres au périphérique », ici pour
 | `B` bit 0 | `0` = crochets, `1` = parenthèses — glyphes spéciaux `B7h`/`B8h` ou `C2h`/`C3h` de la police en `0306C0h` |
 | `X` | les chaînes, chacune terminée par `FFh` ; un `FEh` en tête est sauté |
 
-Chaque case = un glyphe ouvrant, **6** caractères (complétés par des espaces, le reste ignoré — le manuel dit 7), un glyphe fermant : 8 colonnes, 5 cases par ligne. Le guide de la ROM finit sur `retf` sans fixer la retenue : l'appelant fait `rc` (comme `fkey_display` en `0F1D3Eh`). Emploi depuis le BASIC : `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS`.
+Chaque case = un glyphe ouvrant, **6** caractères (un libellé plus court est **complété par des espaces** par la routine elle-même, `LOC_F2CE1` ; un plus long est **tronqué**, elle saute jusqu'au `FFh` suivant en `LOC_F2CCF` — lu puis ✅ **mesuré** le 2026-10-14, `DWGL 0,3,0,"A,TROPLONGPOURSIX,C"` donnant `[A     ][TROPLO][C     ]` ; le manuel dit 7), un glyphe fermant : 8 colonnes, 5 cases par ligne. Le guide de la ROM finit sur `retf` sans fixer la retenue : l'appelant fait `rc` (comme `fkey_display` en `0F1D3Eh`). Emploi depuis le BASIC : `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS`.
 
 **Clavier (device 1), `46H` `fkey_display`, lue en `0F1CFAh`** : le manuel ne cite aucun paramètre, la ROM teste `A` — `A = 1` affiche les libellés des touches de fonction en ligne 3 (fichier `FUNCKEY.`, `BFC45H`), toute autre valeur efface la ligne 3 (`49H`). Retenue armée si l'écran est en 4 lignes (`lcd_height` = 4) ou si le bit 2 de `BFC3FH` interdit l'affichage. ✅ Mesuré (`*FKD`, 2026-10-10).
 
@@ -374,6 +374,7 @@ les deux voies existantes le font de la même façon, avec **les octets mêmes d
 |---|---|---|
 | **ASM** | `Documentation/GUIDE.ASM`, 60 octets | ✅ **éprouvé sur PC-E500S le 2026-10-12** ; `LOAD M` puis `CALL &BF000` |
 | **BASIC** | `*MNU` de `C:\Claude\ROUTINES\ROUTINES\ROUTINES.BAS` | pose **26 octets** en `0BEF60h` et les libellés en `0BEF80h`, puis `CALL &BEF60` ; repli en `LOCATE`/`PRINT` si la zone langage machine n'est pas réservée |
+| **mot-clé** | `DWGL colonne,ligne,tag,chaine$` de `C:\Claude\BASEXT` | la commande devenue **instruction du langage**, dans le module comme dans le pilote résident `BASEXT-DRV` : ni `POKE`, ni zone à réserver. Les libellés sont séparés par des virgules ; `DWGL` refuse ce que la ROM perdrait en silence (ligne ≥ 4, plus de 5 cases, débordement de la ligne → erreur 33). Écrite **et ✅ éprouvée sur PC-E500S le 2026-10-14** (`BASEXT/essais/DWGLTEST.BAS`) ; étude dans `BASEXT/CONCEPTION-DWGL.md`, référentiel `12-extensions-basic.md` §17quinquies |
 
 ✅ **Les trois encodages concordent à l'octet** — `30 CD D4 00 03`, `09 58`, `05 E8 FF 0F` — entre la
 ROM (`0F1D29h`), `GUIDE.OBJ` et les `POKE` de `*MNU`. ⚠️ `GUIDE.ASM` appelle `58h` **directement** :

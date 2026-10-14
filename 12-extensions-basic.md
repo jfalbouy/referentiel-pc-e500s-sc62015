@@ -1,6 +1,6 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
-*Rédigé le 2026-09-03 — mis à jour le 2026-10-07*
+*Rédigé le 2026-09-03 — mis à jour le 2026-10-14*
 
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
@@ -806,8 +806,10 @@ Aucune n'est bloquante ; toutes sont à portée d'une séance de mesure.
 
 ### Sur les arguments et les types
 
-6. **Trois arguments ou plus.** `MOD` en prend deux, sur le modèle de `POINT`. `MID$` en prend
-   trois : lire son lecteur d'arguments donnerait le gabarit.
+6. ✅ **~~Trois arguments ou plus~~** — clos le 2026-10-14 par **`DWGL colonne,ligne,tag,chaine$`**
+   (§17quinquies) : **quatre** arguments non parenthésés, trois nombres et une chaîne. Il n'a pas
+   fallu lire `MID$` : il suffit de rendre `BP` **en absolu** après chaque argument et de lire les
+   virgules à la main. Gabarit : `BASEXT/MODE-EMPLOI.md` §8.5.
 7. ✅ **~~Retourner une CHAÎNE~~** — établi sur machine les 2026-09-14 et 15 : huit fonctions
    chaîne de BASEXT (`UCASE$`, `LCASE$`, `TRIM$`, `LTRIM$`, `RTRIM$`, `REPT$`, `SREPT$`, `INSTR`).
    Lecture, rendu et contrat de `U` : `C:\Claude\BASEXT\MODE-EMPLOI.md` §5.4 et §6.3.
@@ -1114,6 +1116,62 @@ l'installation coûte une table de sites et une boucle de six lignes.
 
 ---
 
+## 17quinquies. `DWGL` — la barre de cases de la machine, ouverte au BASIC
+
+La commande `58h` du device 0 (« display with guide line », `04-fcs-iocs.md` §2.4 et §2.4quater)
+n'a **qu'un seul émetteur dans la ROM**, `fkey_display`, et dessine aussi bien les libellés des
+touches de fonction que la barre `[BASIC ][ CAL  ]…` de l'écran `MENU`. Elle est désormais un
+mot-clé, le quinzième de BASEXT :
+
+```basic
+DWGL colonne, ligne, tag, chaine$
+```
+
+| | |
+|---|---|
+| `colonne`, `ligne` | la première case ; `ligne` de 0 à 3 |
+| `tag` | le registre `B` : **bit 0** parenthèses au lieu de crochets, **bit 7** garder le reste de la ligne |
+| `chaine$` | 1 à 5 libellés **séparés par des virgules** ; `DWGL` ne fait que remplacer chaque virgule par le `FFh` qu'attend la ROM |
+
+⛔ **Six caractères par case, et c'est la ROM qui le fige** (`mv il,006h` en `0F2CB5h`) : une case
+occupe huit colonnes, cinq cases remplissent la ligne de 40. Un libellé plus **court** est complété
+par des espaces par la ROM elle-même (`LOC_F2CE1`), un plus **long** est tronqué (`LOC_F2CCF`) —
+lu le 2026-10-14. Il n'y a donc ni à aligner ni à couper côté extension.
+
+⛔ **Pas de repli de ligne** : l'écriture d'un caractère refuse dès la colonne 40 ou la ligne 4
+(`0F23C3h`), et les cases perdues le sont **en silence**. `DWGL` refuse donc elle-même (erreur 33)
+une ligne ≥ 4, plus de cinq cases, ou `colonne + 8 × cases` > 40. Pour dix choix : **deux appels**,
+comme la ROM, qui garde un drapeau de page, bascule sur la touche **`↕`** et **ajoute 5** à
+l'indice (`0F9A95h`).
+
+⛔ **La touche du MENU est `↕`, et ce ne sont pas les flèches** — ✅ mesuré sur PC-E500S le
+2026-10-14 : dans l'écran `MENU`, les flèches sont **sans effet** ; seules `↕` (page), `MENU`,
+`BASIC` et `PF1`-`PF5` agissent. Le code `0Eh` testé en `0F9AFEh` est le **code matriciel** de
+`↕`, lu par l'IOCS `43h` : **les tables du pilote, celles que voit `INPUT$`** (table à deux
+octets `030806h`, premier octet `00h`) — et non le `0Eh` de la table d'`INKEY$` (`0F9C5Dh`) qui,
+lui, est la flèche droite. **Le MENU lit donc le clavier comme `INPUT$`, pas comme `INKEY$`.** Les
+flèches ont un code à **un** octet (`1Ch`-`1Fh`) : la boucle, qui exige un premier octet nul,
+les rejette. Une première rédaction de ce paragraphe avait lu la bonne adresse dans la mauvaise
+table. 📖 Pour `INKEY$ &1`, `↕` devrait rendre **`1Eh`** (indice `0Eh` de `0F9C5Dh`) —
+non mesuré. ✅ Mesuré le 2026-10-14 : `INKEY$ &1` rend `F1h`-`F5h` et **ne distingue pas
+`2ndF`**, quand `INPUT$ (1)` rend le texte programmé de la touche — c'est donc `INKEY$ &1` qu'un
+menu doit lire.
+
+⚠️ `DWGL` n'est pas `fkey_display` : elle ne refait **aucun** de ses trois contrôles et écrit sur
+la ligne demandée, texte ou pas. ⚠️ Le filtre d'écriture de `XCONSOLE` ne la voit pas (il est sur
+le handle 0 du FCS, `58h` passe par l'IOCS). ⚠️ `CLS` sous un écran de moins de 4 lignes redessine
+les libellés `FUNCKEY` par-dessus (§17bis) : dans une fenêtre, effacer par `XCLS`.
+
+✅ **Éprouvée sur PC-E500S le 2026-10-14** (`BASEXT/essais/DWGLTEST.BAS`, J.-F. Albouy) : les cinq
+cases, le libellé court complété et le long tronqué **par la ROM**, le `tag` `&81` (ligne gardée
+et parenthèses, deux barres sur une même ligne), les sept refus `33 33 33 90 90 33 10`, et un
+menu à dix choix. ✅ Au passage : la `58h` **ne déplace pas le curseur du BASIC**.
+
+Étude complète (la `58h` lue dans la ROM, le modèle de l'écran `MENU`, le marqueur graphique, les
+mesures de clavier) : **`C:\Claude\BASEXT\CONCEPTION-DWGL.md`**.
+
+---
+
 ## 18. Sources
 
 - **`Nx commandes BASIC.docx`** — archive personnelle de J.-F. Albouy, hors dépôt. Traduction française d'un document allemand. **Dix-sept lignes qui spécifient le mécanisme** : les deux crochets, le format des deux listes, les bits 7 et 6, l'obligation de `RETF`, la retenue comme statut d'erreur, `(BP+0)` comme statut BASIC, et `X` comme pointeur de programme en entrée/sortie. C'est la source de référence ; tout le reste de ce document la complète par la lecture de la ROM et la mesure.
@@ -1123,8 +1181,8 @@ l'installation coûte une table de sites et une boucle de six lignes.
 - **Mesures sur PC-E500S et PockEmul**, septembre 2026 — la contrainte de nommage, la limite des 20 bits, le contrat de `X`, et la validation de `LPEEK` et `WPEEK`.
 - **`SC62015Disassembler/Samples/DEVICE9/`** — les sondes du Function Driver : `SQR`, `ADDTEST`, `DIVTEST` (famille 0, §13) et `MATTEST` (famille 1, §17). Chaque source consigne en en-tête le résultat observé et sa lecture.
 - **Manuels Sharp, pour les matrices** — technique, livre pp. 79-82 (PDF pp. 83-86) : les tables des trois familles ; utilisateur allemand `PC-E500S-DE.pdf`, livre pp. 138-148 (PDF pp. 146-156) : le mode MATRIX, le rangement dans les tableaux BASIC, la mémoire et les erreurs.
-- **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15, puis à **quatorze** (`XCONSOLE`, `XCLS`) le 2026-09-16. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
-- **`C:\Claude\BASEXT-DRV\`** — BASEXT résident en pilote de `S1:` : `CONCEPTION.md` (décisions, relocation, versions 0.1 et 0.2, relevés sur émulateur), `essais/BLOCS.BAS` et `DRVTEST.BAS`, `outils/reloc.py`. Source des §§12, 16 (pistes 2 et 5) et 17ter.
+- **`C:\Claude\BASEXT\`** (anciennement `SC62015Disassembler/Samples/BASEXT/`) — le module qui a servi à établir les §§8 à 16 : quatre mots-clés (`LPEEK`, `WPEEK`, `LPOKE`, `MOD`) validés sur machine le 2026-09-05, portés à **douze** le 2026-09-15, puis à **quatorze** (`XCONSOLE`, `XCLS`) le 2026-09-16 et à **quinze** (`DWGL`) le 2026-10-14. Son `JOURNAL-MISE-AU-POINT.md` porte le journal des défauts successifs de `MOD` et de ce que chacun a coûté ; son **`MODE-EMPLOI.md` est le document de référence**.
+- **`C:\Claude\BASEXT-DRV\`** — BASEXT résident en pilote de `S1:` : `CONCEPTION.md` (décisions, relocation, versions 0.1 à 0.3, relevés sur émulateur), `essais/BLOCS.BAS` et `DRVTEST.BAS`, `outils/reloc.py`. Source des §§12, 16 (pistes 2 et 5) et 17ter.
 - **`C:\Claude\HIS111\`** — History 1.11 (TORO, 1994) et `HISTDRV` : source du §17quater ; les images `rom53.bin`, `rom75.bin`, `rom83.bin` et `S3EXT.bin` de `SC62015Disassembler/Samples/ROM/` pour la disposition de l'éditeur et les tables du clavier.
 - **`Samples/Extraction/s1-1.bin`** (`SC62015Disassembler`) — la System Data Area d'un PC-E500S réel, où a été relevé le bloc de contrôle du handle 0 (§17bis).
 
