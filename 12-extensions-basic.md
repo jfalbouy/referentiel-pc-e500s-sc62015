@@ -1,6 +1,6 @@
 # Étendre le BASIC — ajouter ses propres instructions et fonctions
 
-*Rédigé le 2026-09-03 — mis à jour le 2026-10-14*
+*Rédigé le 2026-09-03 — mis à jour le 2026-10-15*
 
 > **➡️ Référent (2026-09-15) : `C:\Claude\BASEXT`**, et son
 > [`MODE-EMPLOI.md`](../BASEXT/MODE-EMPLOI.md). La création d'instructions BASIC a désormais son
@@ -1152,8 +1152,12 @@ octets `030806h`, premier octet `00h`) — et non le `0Eh` de la table d'`INKEY$
 lui, est la flèche droite. **Le MENU lit donc le clavier comme `INPUT$`, pas comme `INKEY$`.** Les
 flèches ont un code à **un** octet (`1Ch`-`1Fh`) : la boucle, qui exige un premier octet nul,
 les rejette. Une première rédaction de ce paragraphe avait lu la bonne adresse dans la mauvaise
-table. 📖 Pour `INKEY$ &1`, `↕` devrait rendre **`1Eh`** (indice `0Eh` de `0F9C5Dh`) —
-non mesuré. ✅ Mesuré le 2026-10-14 : `INKEY$ &1` rend `F1h`-`F5h` et **ne distingue pas
+table. ✅ **Mesuré le 2026-10-15** : cette touche rend **`1Eh`** à `INKEY$ &1` et `00h` puis `0Eh` à
+`INPUT$ (1)` — les deux tables concordent. Donc **`INKEY$ &1` suffit à un menu complet** :
+`F1h`-`F5h` pour cinq choix, `1Eh` pour tourner la page, soit **dix choix réels** sans
+sacrifier `PF5`. Et le marqueur `▲▼` de l'écran MENU se repose en une ligne,
+`GCURSOR (1,25):GPRINT "0A1B1B0A"` (`04-fcs-iocs.md` §2.4ter) : il reste **hors** de `DWGL`,
+où il aurait coûté ~90 octets pour 61 libres. ✅ Mesuré le 2026-10-14 : `INKEY$ &1` rend `F1h`-`F5h` et **ne distingue pas
 `2ndF`**, quand `INPUT$ (1)` rend le texte programmé de la touche — c'est donc `INKEY$ &1` qu'un
 menu doit lire.
 

@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-14*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-15*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -398,6 +398,22 @@ l'identique par un programme — c'est le même appel, aux mêmes octets, avec d
 | Lecture | `PF4` | `CTRL`+`PF4` | `PF5` | `CTRL`+`PF5` | flèches, `C-CE` |
 |---|---|---|---|---|---|
 | `INKEY$ &1` | `F4h` | `F4h` | `F5h` | `F5h` | `05h` bas, `04h` haut, `0Eh` droite, `0Fh` gauche ; `02h` |
+
+✅ **La touche haut-bas (celle qui tourne les pages du MENU), mesurée le 2026-10-15** :
+`INKEY$ &1` rend **`1Eh`**, `INPUT$ (1)` rend **`00h` puis `0Eh`**. Code matriciel `0Eh` : la
+table d'`INKEY$` (`0F9C5Dh`) y porte `1Eh`, celle du pilote à deux octets (`030806h`) `0Eh`.
+L'autre touche à double flèche, large, à gauche de `PF1`, rend `00h` puis `8Ah` sous `INPUT$`
+(code matriciel `5Ah`) — ce n'est pas celle du MENU. ⛔ **Le MENU lit le clavier par l'IOCS
+`43h`, donc par les tables du pilote — celles d'`INPUT$`** : les flèches, dont le code tient sur
+**un** octet (`1Ch`-`1Fh`), sont rejetées par sa boucle, qui n'accepte que les codes à deux
+octets. ✅ Mesuré : dans le MENU, les flèches ne font rien ; seules la touche haut-bas, `MENU`,
+`BASIC` et `PF1`-`PF5` agissent.
+
+✅ **Le marqueur `▲▼` de l'écran MENU se repose en une ligne de BASIC** :
+`GCURSOR (1,25):GPRINT "0A1B1B0A"`. `GCURSOR` prend `y` au **bas** de la colonne de huit points
+— `GPRINT` passe `y − 7` à la commande `4Ah` (`mv y,0FFFFF9h` / `add y,i` en `0FD3D7h`) — et
+`GPRINT` met `dotsop` à 0 lui-même (`0FD350h`). Le motif est lu en `0E229Dh`, la ROM le pose en
+`X = 1`, sommet `Y = 18` (`SUB_E2285`). En général : `GCURSOR (6 × colonne + 1, 8 × ligne + 1)`.
 | `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
 
 - `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
