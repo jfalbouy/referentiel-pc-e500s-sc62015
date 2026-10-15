@@ -410,10 +410,18 @@ octets. ✅ Mesuré : dans le MENU, les flèches ne font rien ; seules la touche
 `BASIC` et `PF1`-`PF5` agissent.
 
 ✅ **Le marqueur `▲▼` de l'écran MENU se repose en une ligne de BASIC** :
-`GCURSOR (1,25):GPRINT "0A1B1B0A"`. `GCURSOR` prend `y` au **bas** de la colonne de huit points
+`GCURSOR (1,23):GPRINT "0A1B1B0A"` — `25` est la valeur de la ROM, `23` celle qu'on retient à
+l'usage (voir plus bas). `GCURSOR` prend `y` au **bas** de la colonne de huit points
 — `GPRINT` passe `y − 7` à la commande `4Ah` (`mv y,0FFFFF9h` / `add y,i` en `0FD3D7h`) — et
 `GPRINT` met `dotsop` à 0 lui-même (`0FD350h`). Le motif est lu en `0E229Dh`, la ROM le pose en
-`X = 1`, sommet `Y = 18` (`SUB_E2285`). En général : `GCURSOR (6 × colonne + 1, 8 × ligne + 1)`.
+`X = 1`, sommet `Y = 18` (`SUB_E2285`). En général : `GCURSOR (6 × colonne + 1, 8 × ligne + 1)` pour coller à la ROM.
+
+⚠️ **Le motif est calé en HAUT de l'octet** : le dessin tient sur les points `0` à `4` de la
+colonne de huit, les points `5` à `7` étant vides. On ne peut donc pas le remonter dans le motif —
+seule l'ordonnée le déplace. Avec `25`, il ne reste **qu'un point libre** entre le bas du marqueur
+(22) et le haut du crochet (24) : c'est l'espacement de la machine, et il frôle. ✅ Mesuré sur
+PC-E500S le 2026-10-15 : `GCURSOR (1,23)` laisse trois points libres et reste dans la ligne
+au-dessus — soit `GCURSOR (6 × colonne + 1, 8 × ligne − 1)`.
 | `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
 
 - `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
