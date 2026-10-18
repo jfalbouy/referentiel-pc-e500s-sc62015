@@ -426,9 +426,44 @@ captures du même écran. **La règle : tracer le marqueur AVANT la barre**, à
 `GCURSOR (6 × colonne + 1, 8 × ligne + 1)` — la position de la ROM. `DWGL` refait ensuite sa ligne,
 et n'efface que celle-là.
 
-📖 La ROM, elle, pose son marqueur **après** la barre sans rien effacer, avec `dotsop` = **1** : les
-trois modes de `dotsop` restent à lire dans la commande `4Ah`, le carnet (« 0 allumer, 1 éteindre »)
-étant contredit par la mesure.
+✅ **Les trois modes de `dotsop`, lus dans la commande `4Ah` elle-même (2026-10-18).** La table
+des commandes du pilote d'écran est en `0F2224h`, indexée par `commande − 3Fh` sur deux octets :
+`4Ah` mène à **`0F80F9h`**. Le mode y est appliqué par un combinateur de dix instructions,
+`0F81EFh` :
+
+```asm
+        mv   a,[dotsop]
+        cmp  a,001H          ; le mode ; mv ne touche pas aux indicateurs
+        mv   a,(cl)          ; A = l'octet DEJA A L'ECRAN
+        jrc  LOC_F8200       ; dotsop = 0
+        jrz  LOC_F8203       ; dotsop = 1
+        xor  a,(0DEH)        ; dotsop >= 2 : OU EXCLUSIF
+        ret
+LOC_F8200:
+        and  a,(di)          ; masque : ne garde que ce qui est HORS fenetre
+LOC_F8203:
+        or   a,(0DEH)        ; puis ajoute les points du motif
+        ret
+```
+
+| `dotsop` | opération | effet |
+|---|---|---|
+| **0** | `(écran ET masque) OU motif` | **remplacement** — les points à **0 du motif EFFACENT** |
+| **1** | `écran OU motif` | **ajout** — n'efface jamais rien |
+| **≥ 2** | `écran OU EXCLUSIF motif` | **inversion** |
+
+✅ **Et tout se referme** : `GPRINT` force le mode **0** (`0FD350h`), d'où l'effacement mesuré des
+deux lignes du crochet ; la ROM emploie le mode **1** pour son marqueur (`0E22BBh`), d'où son droit
+de le poser **après** la barre sans rien abîmer. Le code prédit la mesure, et la mesure confirme le
+code.
+
+⚠️ **Le carnet reste à corriger à sa source** : `pce500.inc` annote `4Ah` « 0 allumer, 1 éteindre,
+2 inverser ». « 1 éteindre » est faux — c'est un OU, il ne peut rien éteindre. L'annotation vient
+vraisemblablement de la commande **`4Ch`** (`display_dot_write`, un point isolé), dont le manuel
+décrit le paramètre `A` ainsi ; or `4Ch` **range précisément `A` dans `dotsop`** (`0F7E14h`), donc
+les deux commandes partagent la variable. 📖 Pour un point isolé, « allumer » coïncide avec le
+remplacement, mais « éteindre » ne coïncide pas avec le OU : le chemin du point isolé prépare
+peut-être d'autres opérandes, ce que je n'ai pas suivi.
 | `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
 
 - `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
