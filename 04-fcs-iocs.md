@@ -457,13 +457,33 @@ deux lignes du crochet ; la ROM emploie le mode **1** pour son marqueur (`0E22BB
 de le poser **après** la barre sans rien abîmer. Le code prédit la mesure, et la mesure confirme le
 code.
 
-⚠️ **Le carnet reste à corriger à sa source** : `pce500.inc` annote `4Ah` « 0 allumer, 1 éteindre,
-2 inverser ». « 1 éteindre » est faux — c'est un OU, il ne peut rien éteindre. L'annotation vient
-vraisemblablement de la commande **`4Ch`** (`display_dot_write`, un point isolé), dont le manuel
-décrit le paramètre `A` ainsi ; or `4Ch` **range précisément `A` dans `dotsop`** (`0F7E14h`), donc
-les deux commandes partagent la variable. 📖 Pour un point isolé, « allumer » coïncide avec le
-remplacement, mais « éteindre » ne coïncide pas avec le OU : le chemin du point isolé prépare
-peut-être d'autres opérandes, ce que je n'ai pas suivi.
+⛔ **Le carnet disait « 0 allumer, 1 éteindre, 2 inverser » pour la `4Ah` : c'est faux**, un OU
+n'éteint rien. Corrigé à sa source (`SC62015Disassembler/Data/FCSFunctions.json`), `pce500.inc`
+régénéré.
+
+✅ **Et la même variable a DEUX sens, selon la commande qui la lit** (lu le 2026-10-18). Le point
+isolé ne passe pas par ce combinateur : il a sa propre primitive, **`0F7CFAh`**, qui met le bit à sa
+place par rotation, garde l'octet écran dans `(0DEh)`, puis décide en `0F7D46h` :
+
+```asm
+        cmp  [dotsop],001H
+        jrc  LOC_F7D5F       ; 0 -> or  a,(0DEh)              ALLUMER
+        jrz  LOC_F7D54       ; 1 -> 0FFh - bit, puis and      ETEINDRE
+        xor  a,(0DEh)        ; 2 et au-dela                   INVERSER
+```
+
+| `dotsop` | `4Ch` `dot_write` et `4Eh` `line_draw` | `4Ah` `dot8_write` |
+|---|---|---|
+| **0** | `écran OU bit` → **allumer** | `(écran ET masque) OU motif` → **remplacement** |
+| **1** | `écran ET NON bit` → **éteindre** | `écran OU motif` → **ajout** |
+| **≥ 2** | `OU EXCLUSIF` → inverser | `OU EXCLUSIF` → inversion |
+
+`4Eh` suit la colonne de gauche parce qu'elle **trace point par point** : elle appelle la primitive
+du point isolé en trois endroits (`0F7B81h`, `0F7BD3h`, `0F7C0Fh`).
+
+✅ **Le carnet avait donc raison — mais pas là où il le disait.** « 0 allumer, 1 éteindre,
+2 inverser » est juste pour `4Ch` et `4Eh`, et c'est de là que la phrase a glissé sur `4Ah`, où elle
+est fausse. `PSET` charge 0 et `PRESET` charge 1 : tout concorde.
 | `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
 
 - `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
