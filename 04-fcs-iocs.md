@@ -1,6 +1,6 @@
 # FCS et IOCS — appels système du PC-E500S
 
-*Rédigé le 2026-08-26 — mis à jour le 2026-10-15*
+*Rédigé le 2026-08-26 — mis à jour le 2026-10-18*
 
 > Voir `00-index.md` pour la vue d'ensemble. Source principale : *Technical Reference Manual PC-E500* (chapitres 1 « File Control System », 2 « Outline of IOCS », 3 « How to use each device »), recoupé avec `SC62015Disassembler/Data/FCSFunctions.json`. Le manuel documente 17 fonctions FCS (`00H`-`10H`). Lors de la première rédaction de ce fichier (juillet 2026), le JSON du désassembleur n'en couvrait que 9 et ce fichier comblait les 8 autres ; **le carnet les porte désormais toutes les 17**, avec leurs registres d'entrée et de sortie, ainsi que les commandes IOCS communes, celles du device 0 et les 39 du device 9 (`SC62015Disassembler/CLAUDE.md` §8).
 
@@ -410,18 +410,25 @@ octets. ✅ Mesuré : dans le MENU, les flèches ne font rien ; seules la touche
 `BASIC` et `PF1`-`PF5` agissent.
 
 ✅ **Le marqueur `▲▼` de l'écran MENU se repose en une ligne de BASIC** :
-`GCURSOR (1,23):GPRINT "0A1B1B0A"` — `25` est la valeur de la ROM, `23` celle qu'on retient à
-l'usage (voir plus bas). `GCURSOR` prend `y` au **bas** de la colonne de huit points
+`GCURSOR (1,25):GPRINT "0A1B1B0A"`, **tracé AVANT la barre** (voir plus bas). `GCURSOR` prend `y` au **bas** de la colonne de huit points
 — `GPRINT` passe `y − 7` à la commande `4Ah` (`mv y,0FFFFF9h` / `add y,i` en `0FD3D7h`) — et
 `GPRINT` met `dotsop` à 0 lui-même (`0FD350h`). Le motif est lu en `0E229Dh`, la ROM le pose en
 `X = 1`, sommet `Y = 18` (`SUB_E2285`). En général : `GCURSOR (6 × colonne + 1, 8 × ligne + 1)` pour coller à la ROM.
 
 ⚠️ **Le motif est calé en HAUT de l'octet** : le dessin tient sur les points `0` à `4` de la
-colonne de huit, les points `5` à `7` étant vides. On ne peut donc pas le remonter dans le motif —
-seule l'ordonnée le déplace. Avec `25`, il ne reste **qu'un point libre** entre le bas du marqueur
-(22) et le haut du crochet (24) : c'est l'espacement de la machine, et il frôle. ✅ Mesuré sur
-PC-E500S le 2026-10-15 : `GCURSOR (1,23)` laisse trois points libres et reste dans la ligne
-au-dessus — soit `GCURSOR (6 × colonne + 1, 8 × ligne − 1)`.
+colonne de huit, les points `5` à `7` étant **vides**.
+
+⛔ **Et ces trois points vides effacent, car `GPRINT` remplace.** Il met `dotsop` à **0**
+(`and [dotsop],000h` en `0FD350h`) et écrit la colonne de huit points **entière, bits à zéro
+compris** : tracé *après* la barre, le marqueur supprime les deux premières lignes de points du
+crochet. ✅ Mesuré sur PC-E500S le 2026-10-18 (J.-F. Albouy), et vérifié au pixel sur trois
+captures du même écran. **La règle : tracer le marqueur AVANT la barre**, à
+`GCURSOR (6 × colonne + 1, 8 × ligne + 1)` — la position de la ROM. `DWGL` refait ensuite sa ligne,
+et n'efface que celle-là.
+
+📖 La ROM, elle, pose son marqueur **après** la barre sans rien effacer, avec `dotsop` = **1** : les
+trois modes de `dotsop` restent à lire dans la commande `4Ah`, le carnet (« 0 allumer, 1 éteindre »)
+étant contredit par la mesure.
 | `INPUT$ (1)` | texte programmé (`SAVE `) | `00h` puis `56h` | texte programmé (`LOAD `) | `00h` puis `57h` | `1Fh`, `1Eh`, `1Ch`, `1Dh` ; `0Ch` |
 
 - `INKEY$` passe par sa propre table (`0F9C5Dh`) et **ignore `CTRL`**. `INPUT$` lit le pilote `STDI:` (FCS) : codes à deux octets `00h` + code de la table du manuel technique p. 47 (`CTRL`+`PF1`…`PF5` = `53h`…`57h`), mais les PF seules y rendent le **texte qui leur est programmé** (`RUN `, `LIST `, `CONT `, `SAVE `, `LOAD ` ici) : inutilisable pour un menu PF. `INPUT$` (token `INPUT` + `$`) est réaffiché `INPUT $ (1)` par `sharpbasic`, octets identiques.
